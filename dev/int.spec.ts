@@ -1,8 +1,6 @@
 /* eslint-disable no-console */
 /**
- * Here are your integration tests for the plugin.
- * They don't require running your Next.js so they are fast
- * Yet they still can test the Local API and custom endpoints using NextRESTClient helper.
+ * Integration tests for the A/B testing plugin
  */
 
 import type { Payload } from 'payload'
@@ -21,7 +19,7 @@ let payload: Payload
 let restClient: NextRESTClient
 let memoryDB: MongoMemoryReplSet | undefined
 
-describe('Plugin tests', () => {
+describe('A/B Testing Plugin', () => {
   beforeAll(async () => {
     process.env.DISABLE_PAYLOAD_HMR = 'true'
     process.env.PAYLOAD_DROP_DATABASE = 'true'
@@ -59,32 +57,107 @@ describe('Plugin tests', () => {
     }
   })
 
-  it('should query added by plugin custom endpoint', async () => {
-    const response = await restClient.GET('/my-plugin-endpoint')
-    expect(response.status).toBe(200)
-
-    const data = await response.json()
-    expect(data).toMatchObject({
-      message: 'Hello from custom endpoint',
-    })
-  })
-
-  it('can create post with a custom text field added by plugin', async () => {
+  it('can create post with A/B testable fields', async () => {
+    // Create a post with A/B test variants for the title field
     const post = await payload.create({
       collection: 'posts',
       data: {
-        addedByPlugin: 'added by plugin',
+        title: {
+          default: 'Default Title',
+          'variant-a': 'Variant A Title',
+          'variant-b': 'Variant B Title',
+        },
+        content: {
+          default: [{ children: [{ text: 'Default content' }] }],
+          'variant-a': [{ children: [{ text: 'Variant A content' }] }],
+        },
       },
     })
 
-    expect(post.addedByPlugin).toBe('added by plugin')
+    // Verify A/B test structure is preserved
+    expect(post.title).toEqual({
+      default: 'Default Title',
+      'variant-a': 'Variant A Title',
+      'variant-b': 'Variant B Title',
+    })
+
+    // Verify partial variants work (variant-b not specified for content)
+    expect(post.content.default).toBeDefined()
+    expect(post.content['variant-a']).toBeDefined()
+    expect(post.content['variant-b']).toBeUndefined()
   })
 
-  it('plugin creates and seeds plugin-collection', async () => {
-    expect(payload.collections['plugin-collection']).toBeDefined()
+  it('correctly serves variants based on abVariant parameter', async () => {
+    // Create a test post with multiple variants
+    const testPost = await payload.create({
+      collection: 'posts',
+      data: {
+        title: {
+          default: 'Default Title',
+          'variant-a': 'Variant A Title',
+          'variant-b': 'Variant B Title',
+        },
+        summary: {
+          default: 'Default summary',
+          'variant-a': 'Variant A summary',
+        },
+      },
+    })
 
-    const { docs } = await payload.find({ collection: 'plugin-collection' })
+    // Test fetching with default variant
+    const defaultResponse = await payload.findByID({
+      collection: 'posts',
+      id: testPost.id,
+      // No abVariant means default
+    })
 
-    expect(docs).toHaveLength(1)
+    // Test fetching with variant-a
+    const variantAResponse = await payload.findByID({
+      collection: 'posts',
+      id: testPost.id,
+      req: {
+        // Mock the abVariant value that would be set by middleware
+        abVariant: 'variant-a',
+      } as any,
+    })
+
+    // Test fetching with variant-b
+    const variantBResponse = await payload.findByID({
+      collection: 'posts',
+      id: testPost.id,
+      req: {
+        abVariant: 'variant-b',
+      } as any,
+    })
+
+    // Expect the correct values for each variant
+    expect(defaultResponse.title).toBe('Default Title')
+    expect(defaultResponse.summary).toBe('Default summary')
+    
+    expect(variantAResponse.title).toBe('Variant A Title')
+    expect(variantAResponse.summary).toBe('Variant A summary')
+    
+    expect(variantBResponse.title).toBe('Variant B Title')
+    // Variant B doesn't have a summary, should fall back to default
+    expect(variantBResponse.summary).toBe('Default summary')
+  })
+
+  it('handles the track endpoint correctly', async () => {
+    // Test the tracking endpoint
+    const response = await restClient.POST('/api/ab-testing/track', {
+      body: JSON.stringify({
+        variant: 'variant-a',
+        event: 'test_conversion',
+        properties: {
+          page: '/test-page',
+        },
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const data = await response.json()
+    expect(data).toMatchObject({
+      success: true,
+    })
   })
 })

@@ -2,13 +2,13 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { buildConfig } from 'payload'
-import { abTestingPlugin } from 'ab-testing-plugin'
 import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
 import { devUser } from './helpers/credentials.js'
 import { testEmailAdapter } from './helpers/testEmailAdapter.js'
 import { seed } from './seed.js'
+import { abTestingPlugin } from '../src/index.js'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -27,7 +27,25 @@ export default buildConfig({
   collections: [
     {
       slug: 'posts',
-      fields: [],
+      fields: [
+        {
+          name: 'title',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'content',
+          type: 'richText',
+        },
+        {
+          name: 'summary',
+          type: 'textarea',
+        },
+        {
+          name: 'publishDate',
+          type: 'date',
+        },
+      ],
     },
     {
       slug: 'media',
@@ -47,8 +65,18 @@ export default buildConfig({
   },
   plugins: [
     abTestingPlugin({
-      collections: {
-        posts: true,
+      collections: ['posts'],
+      variants: [
+        { code: 'variant-a', label: 'Variant A', weight: 0.7 },
+        { code: 'variant-b', label: 'Variant B', weight: 0.3 },
+      ],
+      defaultVariant: 'default',
+      fallback: true,
+      analytics: {
+        trackEvent: ({ variant, userId, properties }) => {
+          // Custom tracking implementation for development
+          console.log(`[A/B Testing] Variant ${variant} served to ${userId}`, properties);
+        },
       },
     }),
   ],
