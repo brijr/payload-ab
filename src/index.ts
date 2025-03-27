@@ -93,22 +93,33 @@ export const abTestingPlugin =
           })
         }
 
-        return {
-          ...collection,
+        // Create a collapsible field to contain the A/B variant
+        const abVariantField: Field = {
+          type: 'collapsible',
+          admin: {
+            description:
+              'Optional variant for A/B testing - contains selected fields from the main content',
+            initCollapsed: true,
+          },
           fields: [
-            ...(collection.fields || []),
             {
               name: 'abVariant',
               type: 'group',
               admin: {
-                description:
-                  'Optional variant for A/B testing - contains selected fields from the main content',
+                className: 'ab-variant-group',
+                description: 'Leave empty to use the default content',
               },
               fields: contentFields,
-              label: 'A/B Variant',
-              required: false, // optional; if missing, default page will be used
+              label: 'Variant Content',
             } as Field,
           ],
+          label: 'A/B Testing Variant',
+        }
+
+        // Create a new collection with the A/B variant field
+        return {
+          ...collection,
+          fields: [...(collection.fields || []), abVariantField],
         }
       }
       return collection
