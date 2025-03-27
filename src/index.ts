@@ -1,113 +1,73 @@
-import type { CollectionSlug, Config } from 'payload'
+import type { Config, Field } from 'payload'
 
-export type Config = {
+export interface ABTestingPluginOptions {
   /**
-   * List of collections to add a custom field
+   * List of collection slugs to add A/B testing fields to
    */
-  collections?: Partial<Record<CollectionSlug, true>>
+  collections: string[]
+  /**
+   * Enable or disable the plugin
+   * @default false
+   */
   disabled?: boolean
 }
 
-export const  =
-  (pluginOptions: Config) =>
-  (config: Config): Config => {
+/**
+ * Payload CMS plugin for A/B testing with PostHog
+ * Adds an optional abVariant field group to specified collections
+ */
+export const abTestingPlugin = 
+  (pluginOptions: ABTestingPluginOptions) =>
+  (incomingConfig: Config): Config => {
+    // Create a copy of the incoming config
+    const config = { ...incomingConfig }
+
+    // Ensure collections exist
     if (!config.collections) {
       config.collections = []
     }
 
-    config.collections.push({
-      slug: 'plugin-collection',
-      fields: [
-        {
-          name: 'id',
-          type: 'text',
-        },
-      ],
-    })
-
-    if (pluginOptions.collections) {
-      for (const collectionSlug in pluginOptions.collections) {
-        const collection = config.collections.find(
-          (collection) => collection.slug === collectionSlug,
-        )
-
-        if (collection) {
-          collection.fields.push({
-            name: 'addedByPlugin',
-            type: 'text',
-            admin: {
-              position: 'sidebar',
-            },
-          })
-        }
-      }
-    }
-
-    /**
-     * If the plugin is disabled, we still want to keep added collections/fields so the database schema is consistent which is important for migrations.
-     * If your plugin heavily modifies the database schema, you may want to remove this property.
-     */
+    // If the plugin is disabled, return the config as is
     if (pluginOptions.disabled) {
       return config
     }
 
-    if (!config.endpoints) {
-      config.endpoints = []
-    }
-
-    if (!config.admin) {
-      config.admin = {}
-    }
-
-    if (!config.admin.components) {
-      config.admin.components = {}
-    }
-
-    if (!config.admin.components.beforeDashboard) {
-      config.admin.components.beforeDashboard = []
-    }
-
-    config.admin.components.beforeDashboard.push(
-      `/client#BeforeDashboardClient`,
-    )
-    config.admin.components.beforeDashboard.push(
-      `/rsc#BeforeDashboardServer`,
-    )
-
-    config.endpoints.push({
-      handler: () => {
-        return Response.json({ message: 'Hello from custom endpoint' })
-      },
-      method: 'get',
-      path: '/my-plugin-endpoint',
+    // Map over the collections in the config
+    const modifiedCollections = config.collections.map((collection) => {
+      // Only modify collections that match our options
+      if (pluginOptions.collections.includes(collection.slug)) {
+        return {
+          ...collection,
+          fields: [
+            ...(collection.fields || []),
+            {
+              name: 'abVariant',
+              type: 'group',
+              admin: {
+                description: 'Optional variant for A/B testing'
+              },
+              fields: [
+                {
+                  name: 'content',
+                  type: 'richText',
+                  label: 'Variant Content',
+                } as Field,
+                // You can add more fields here as needed for your variants
+              ],
+              label: 'A/B Variant',
+              required: false, // optional; if missing, default page will be used
+            } as Field,
+          ],
+        }
+      }
+      return collection
     })
 
-    const incomingOnInit = config.onInit
-
-    config.onInit = async (payload) => {
-      // Ensure we are executing any existing onInit functions before running our own.
-      if (incomingOnInit) {
-        await incomingOnInit(payload)
-      }
-
-      const { totalDocs } = await payload.count({
-        collection: 'plugin-collection',
-        where: {
-          id: {
-            equals: 'seeded-by-plugin',
-          },
-        },
-      })
-
-      if (totalDocs === 0) {
-        await payload.create({
-          collection: 'plugin-collection',
-          data: {
-            id: 'seeded-by-plugin',
-          },
-        })
-      }
-    }
+    // Update the config with the modified collections
+    config.collections = modifiedCollections
 
     return config
   }
+
+// For backward compatibility
+export default abTestingPlugin

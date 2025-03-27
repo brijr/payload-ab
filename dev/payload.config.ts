@@ -2,10 +2,10 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { buildConfig } from 'payload'
-import {  } from ''
 import sharp from 'sharp'
 import { fileURLToPath } from 'url'
 
+import { abTestingPlugin } from '../src/index.js'
 import { devUser } from './helpers/credentials.js'
 import { testEmailAdapter } from './helpers/testEmailAdapter.js'
 import { seed } from './seed.js'
@@ -27,7 +27,33 @@ export default buildConfig({
   collections: [
     {
       slug: 'posts',
-      fields: [],
+      fields: [
+        {
+          name: 'title',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'content',
+          type: 'richText',
+          required: true,
+        },
+      ],
+    },
+    {
+      slug: 'pages',
+      fields: [
+        {
+          name: 'title',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'content',
+          type: 'richText',
+          required: true,
+        },
+      ],
     },
     {
       slug: 'media',
@@ -46,10 +72,8 @@ export default buildConfig({
     await seed(payload)
   },
   plugins: [
-    ({
-      collections: {
-        posts: true,
-      },
+    abTestingPlugin({
+      collections: ['posts', 'pages'], // Apply A/B testing to these collections
     }),
   ],
   secret: process.env.PAYLOAD_SECRET || 'test-secret_key',
