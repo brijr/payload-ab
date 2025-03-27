@@ -2,10 +2,6 @@
 
 A powerful plugin for Payload CMS 3.x that adds A/B testing capabilities to your collections, designed to work seamlessly with PostHog for analytics tracking.
 
-## Version
-
-Current version: **0.1.5**
-
 ## Features
 
 - 🧪 Add A/B testing variant fields to specific collections
@@ -21,10 +17,8 @@ Current version: **0.1.5**
 ```bash
 # Using npm
 npm install payload-ab
-
 # Using pnpm
 pnpm add payload-ab
-
 # Using yarn
 yarn add payload-ab
 ```
@@ -44,15 +38,6 @@ This happens because the database tries to add non-nullable fields to existing r
 3. Or manually add default values to existing records before applying the schema changes
 
 For PostgreSQL users, you can also modify the migration to include `DEFAULT NULL` for the new columns.
-
-### Version 0.1.5 Improvements
-
-Version 0.1.5 includes a safer implementation that:
-
-- Preserves all existing collection fields without modification
-- Only adds new A/B testing fields to your collections
-- Prevents potential data loss when adding to existing collections
-- Improves compatibility with Next.js 15+ App Router
 
 ## Detailed Setup Guide
 
