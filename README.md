@@ -102,9 +102,9 @@ The plugin adds two main components to your collection admin UI:
 
 This approach gives content editors full control over which items have A/B variants, making the testing process more intentional and focused.
 
-### 3. Using A/B variants in your frontend
+### 3. Using A/B variants in your frontend with Next.js 15+ App Router
 
-Here's an example of how to use the A/B variants in a Next.js application with PostHog:
+Here's an example of how to use the A/B variants in a Next.js 15+ application with PostHog:
 
 ```typescript
 // middleware.ts
@@ -146,167 +146,116 @@ import { notFound } from 'next/navigation'
 import { PostHogPageView } from '@/components/analytics/PostHogPageView'
 
 export default async function Page({ params }: { params: { slug: string } }) {
-  // Get the page data
-  const page = await payload.find({
-    collection: 'pages',
-    where: {
-      slug: {
-        equals: params.slug,
-      },
-    },
-  }).then(res => res.docs[0])
+  // Get the cookie store asynchronously (Next.js 15+ requirement)
+  const cookieStore = await cookies()
 
-  if (!page) {
-    return notFound()
-  }
+  // Get the variant from cookies
+  const variant = cookieStore.get('abVariant')?.value || 'default'
 
-  // Check if this page has a variant
-  const hasVariant = Boolean(page.abVariant && Object.keys(page.abVariant).length > 0)
+  // Get the page data with params (now async in Next.js 15+)
+  const slug = await params.slug
 
-  // Get the user's assigned variant from cookies
-  const cookieStore = cookies()
-  const userVariant = cookieStore.get('abVariant')?.value || 'default'
-
-  // Determine if we should show the variant
-  const showVariant = hasVariant && userVariant === 'variant'
-
-  // Merge the content - start with default and override with variant if needed
-  const content = showVariant
-    ? { ...page, ...page.abVariant }
-    : page
-
-  return (
-    <div>
-      {/* Analytics tracking component */}
-      <PostHogPageView
-        pageId={page.id}
-        variant={showVariant ? 'variant' : 'default'}
-      />
-
-      {/* Render the content */}
-      <h1>{content.title}</h1>
-      <div dangerouslySetInnerHTML={{ __html: content.content }} />
-    </div>
-  )
-}
-```
-
-```typescript
-// components/analytics/PostHogPageView.tsx
-'use client'
-
-import { useEffect } from 'react'
-import posthog from 'posthog-js'
-
-export function PostHogPageView({
-  pageId,
-  variant,
-}: {
-  pageId: string
-  variant: 'default' | 'variant'
-}) {
-  useEffect(() => {
-    // Initialize PostHog if not already done
-    if (typeof window !== 'undefined' && !posthog.__loaded) {
-      posthog.init('YOUR_PROJECT_API_KEY', {
-        api_host: 'https://us.i.posthog.com',
-        capture_pageview: false, // We'll handle pageviews manually
-      })
-    }
-
-    // Track which variant was viewed
-    posthog.capture('page_view', {
-      variant,
-      pageId,
-      $current_url: window.location.href,
-    })
-  }, [pageId, variant])
-
-  return null
-}
-```
-
-#### Next.js Pages Router Example
-
-If you're using the Pages Router:
-
-```typescript
-// pages/[slug].js
-import { useEffect } from 'react'
-import { getCookie } from 'cookies-next'
-import posthog from 'posthog-js'
-import payload from '../payload' // Your Payload client
-
-export default function Page({ page, variant }) {
-  // Merge the content - start with default and override with variant
-  const content = variant === 'variant' && page.abVariant
-    ? { ...page, ...page.abVariant }
-    : page
-
-  useEffect(() => {
-    // Initialize PostHog
-    if (typeof window !== 'undefined' && !posthog.__loaded) {
-      posthog.init('YOUR_PROJECT_API_KEY', {
-        api_host: 'https://us.i.posthog.com'
-      })
-    }
-
-    // Track which variant was viewed
-    posthog.capture('page_view', {
-      variant,
-      pageId: page.id,
-      $current_url: window.location.href
-    })
-  }, [page.id, variant])
-
-  return (
-    <div>
-      <h1>{content.title}</h1>
-      <div dangerouslySetInnerHTML={{ __html: content.content }} />
-    </div>
-  )
-}
-
-export async function getServerSideProps({ params, req, res }) {
-  // Get the page data
+  // Fetch the page data
   const pageData = await payload.find({
     collection: 'pages',
     where: {
       slug: {
-        equals: params.slug,
+        equals: slug,
       },
     },
-  }).then(res => res.docs[0])
+  })
 
-  if (!pageData) {
-    return { notFound: true }
+  // If no page is found, return 404
+  if (!pageData.docs || pageData.docs.length === 0) {
+    notFound()
   }
 
-  // Check if this page has a variant
-  const hasVariant = Boolean(pageData.abVariant && Object.keys(pageData.abVariant).length > 0)
+  const page = pageData.docs[0]
 
-  // Get or set the user's variant
-  let variant = getCookie('abVariant', { req, res })
+  // Check if A/B testing is enabled for this page
+  const isABTestingEnabled = page.enableABTesting || false
 
-  if (!variant) {
-    // Assign a variant to new users (50/50 split)
-    variant = Math.random() > 0.5 ? 'variant' : 'default'
-    setCookie('abVariant', variant, {
-      req,
-      res,
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: '/',
+  // Determine which content to show
+  const showVariant = isABTestingEnabled && variant === 'variant' && page.abVariant
+  const content = showVariant ? page.abVariant : page
+
+  return (
+    <div>
+      {/* Track the page view with the variant info */}
+      <PostHogPageView
+        properties={{
+          abTest: isABTestingEnabled ? 'active' : 'inactive',
+          variant: showVariant ? 'variant' : 'default',
+          pageId: page.id,
+        }}
+      />
+
+      <h1>{content.title}</h1>
+      <div dangerouslySetInnerHTML={{ __html: content.content }} />
+    </div>
+  )
+}
+```
+
+### 4. Next.js 15+ Route Handler Example
+
+If you're using route handlers for API endpoints, here's how to implement A/B testing in a Next.js 15+ route handler:
+
+```typescript
+// app/api/content/[slug]/route.ts
+import { cookies } from 'next/headers'
+import { payload } from '@/lib/payload'
+import { NextResponse } from 'next/server'
+
+// Route handlers are no longer cached by default in Next.js 15+
+// Add this to opt into caching if needed
+export const dynamic = 'force-dynamic'
+
+export async function GET(request: Request, { params }: { params: { slug: string } }) {
+  try {
+    // Get the cookie store asynchronously
+    const cookieStore = await cookies()
+
+    // Get the variant from cookies
+    const variant = cookieStore.get('abVariant')?.value || 'default'
+
+    // Get the slug parameter asynchronously
+    const slug = await params.slug
+
+    // Fetch the content
+    const contentData = await payload.find({
+      collection: 'pages',
+      where: {
+        slug: {
+          equals: slug,
+        },
+      },
     })
-  }
 
-  // Only use variant if the page has one and user is assigned to variant group
-  const useVariant = hasVariant && variant === 'variant'
+    if (!contentData.docs || contentData.docs.length === 0) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
 
-  return {
-    props: {
-      page: pageData,
-      variant: useVariant ? 'variant' : 'default',
-    },
+    const content = contentData.docs[0]
+
+    // Check if A/B testing is enabled for this content
+    const isABTestingEnabled = content.enableABTesting || false
+
+    // Determine which content to return
+    const showVariant = isABTestingEnabled && variant === 'variant' && content.abVariant
+    const responseData = showVariant ? content.abVariant : content
+
+    // Return the appropriate content
+    return NextResponse.json({
+      data: responseData,
+      meta: {
+        abTest: isABTestingEnabled ? 'active' : 'inactive',
+        variant: showVariant ? 'variant' : 'default',
+      },
+    })
+  } catch (error) {
+    console.error('Error fetching content:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
 ```
