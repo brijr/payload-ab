@@ -17,6 +17,30 @@ export interface ABTestingPluginOptions {
    * @default false
    */
   disabled?: boolean
+  /**
+   * PostHog configuration options
+   */
+  posthog?: PostHogConfig
+}
+
+/**
+ * PostHog configuration options
+ */
+export interface PostHogConfig {
+  /**
+   * PostHog project API key
+   */
+  apiKey?: string
+  /**
+   * PostHog feature flag key to use for this experiment
+   * If not provided, one will be generated based on the collection slug
+   */
+  featureFlagKey?: string
+  /**
+   * PostHog host URL
+   * @default 'https://app.posthog.com'
+   */
+  host?: string
 }
 
 export interface ABCollectionConfig {
@@ -139,6 +163,30 @@ export const abTestingPlugin =
           label: 'Enable A/B Testing',
         }
 
+        // Create PostHog fields for feature flag integration
+        const posthogFields: Field[] = [
+          {
+            name: 'posthogFeatureFlagKey',
+            type: 'text',
+            admin: {
+              condition: (data) => Boolean(data?.enableABTesting),
+              description:
+                'PostHog feature flag key for this experiment (auto-generated if left empty)',
+            },
+            label: 'PostHog Feature Flag Key',
+          },
+          {
+            name: 'posthogVariantName',
+            type: 'text',
+            admin: {
+              condition: (data) => Boolean(data?.enableABTesting),
+              description: 'Name of this variant in PostHog (defaults to "variant")',
+            },
+            defaultValue: 'variant',
+            label: 'Variant Name',
+          },
+        ]
+
         // Create a tabs field with an A/B Testing tab
         const abTestingTab: Field = {
           type: 'tabs',
@@ -153,6 +201,7 @@ export const abTestingPlugin =
               description: 'Configure A/B testing variants for this content',
               fields: [
                 enableABTestingField,
+                ...posthogFields,
                 {
                   name: 'abVariant',
                   type: 'group',
