@@ -219,4 +219,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 MIT
 
-Created by [Bridger](https://brider.to).
+Created by [Bridger](https://bridger.to).
