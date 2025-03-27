@@ -128,10 +128,22 @@ export const abTestingPlugin =
           return fieldCopy
         })
 
-        // Create a collapsible field to contain the A/B variant
+        // Add a toggle field to enable/disable A/B testing for this document
+        const enableABTestingField: Field = {
+          name: 'enableABTesting',
+          type: 'checkbox',
+          admin: {
+            description: 'Check this box to create an A/B testing variant for this document',
+          },
+          defaultValue: false,
+          label: 'Enable A/B Testing',
+        }
+
+        // Create a collapsible field to contain the A/B variant, conditionally shown based on the toggle
         const abVariantField: Field = {
           type: 'collapsible',
           admin: {
+            condition: (data) => Boolean(data?.enableABTesting),
             description:
               'Optional variant for A/B testing - contains selected fields from the main content',
             initCollapsed: true,
@@ -142,7 +154,7 @@ export const abTestingPlugin =
               type: 'group',
               admin: {
                 className: 'ab-variant-group',
-                description: 'Leave empty to use the default content',
+                description: 'Configure your A/B testing variant content here',
               },
               fields: variantFields,
               label: 'Variant Content',
@@ -151,10 +163,10 @@ export const abTestingPlugin =
           label: 'A/B Testing Variant',
         }
 
-        // Create a new collection with the A/B variant field
+        // Create a new collection with the A/B variant fields
         return {
           ...collection,
-          fields: [...(collection.fields || []), abVariantField],
+          fields: [...(collection.fields || []), enableABTestingField, abVariantField],
         }
       }
       return collection
