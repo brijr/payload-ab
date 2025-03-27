@@ -139,43 +139,50 @@ export const abTestingPlugin =
           label: 'Enable A/B Testing',
         }
 
-        // Create a collapsible field to contain the A/B variant, conditionally shown based on the toggle
-        const abVariantField: Field = {
-          type: 'collapsible',
-          admin: {
-            condition: (data) => Boolean(data?.enableABTesting),
-            description:
-              'Optional variant for A/B testing - contains selected fields from the main content',
-            initCollapsed: true,
-          },
-          fields: [
+        // Create a tabs field with an A/B Testing tab
+        const abTestingTab: Field = {
+          type: 'tabs',
+          tabs: [
+            // Keep the original tabs/fields as they are
             {
-              name: 'abVariant',
-              type: 'group',
-              admin: {
-                className: 'ab-variant-group',
-                description: 'Configure your A/B testing variant content here',
-              },
-              fields: variantFields,
-              label: 'Variant Content',
-              localized: false,
-              nullable: true,
-              required: false,
-              unique: false,
-            } as GroupField,
+              fields: collection.fields || [],
+              label: 'Content',
+            },
+            // Add a new tab for A/B Testing
+            {
+              description: 'Configure A/B testing variants for this content',
+              fields: [
+                enableABTestingField,
+                {
+                  name: 'abVariant',
+                  type: 'group',
+                  admin: {
+                    className: 'ab-variant-group',
+                    condition: (data) => Boolean(data?.enableABTesting),
+                    description: 'Configure your A/B testing variant content here',
+                  },
+                  fields: variantFields,
+                  label: 'Variant Content',
+                  localized: false,
+                  nullable: true,
+                  required: false,
+                  unique: false,
+                } as GroupField,
+              ],
+              label: 'A/B Testing',
+            },
           ],
-          label: 'A/B Testing Variant',
         }
 
-        // Add the A/B testing fields to the collection WITHOUT modifying existing fields
-        // This is the safest approach to prevent data loss
+        // Return the modified collection with tabs
         return {
           ...collection,
-          fields: [
-            ...(collection.fields || []), // Keep all existing fields exactly as they are
-            enableABTestingField, // Add the toggle field
-            abVariantField, // Add the variant field
-          ],
+          admin: {
+            ...collection.admin,
+            // Ensure we preserve any existing useAsTitle setting
+            useAsTitle: collection.admin?.useAsTitle || 'title',
+          },
+          fields: [abTestingTab],
         }
       }
       return collection

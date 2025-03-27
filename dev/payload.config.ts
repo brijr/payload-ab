@@ -98,16 +98,7 @@ export default buildConfig({
   },
   plugins: [
     abTestingPlugin({
-      collections: {
-        // For posts, only include title and content in the A/B variant
-        posts: {
-          fields: ['title', 'content'],
-        },
-        // For pages, include all fields except metaDescription
-        pages: {
-          excludeFields: ['id', 'createdAt', 'updatedAt', 'metaDescription'],
-        },
-      },
+      collections: ['posts'],
     }),
   ],
   secret: process.env.PAYLOAD_SECRET || 'test-secret_key',
