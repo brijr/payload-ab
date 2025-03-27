@@ -1,130 +1,113 @@
-import type { CollectionSlug, Config, Field } from 'payload'
-import { abTestingMiddleware } from './middleware/abTestingMiddleware'
-import { injectAbTestableIntoFields } from './utilities/injectAbTestableIntoFields'
-import type { ABTestVariant } from './types'
+import type { CollectionSlug, Config } from 'payload'
 
-export type { ABTestVariant } from './types'
-
-export type AbTestingPluginConfig = {
+export type Config = {
   /**
-   * Enable or disable the plugin
+   * List of collections to add a custom field
    */
-  enabled?: boolean
-  /**
-   * List of collections to enable A/B testing for
-   */
-  collections?: CollectionSlug[]
-  /**
-   * List of A/B test variants
-   */
-  variants: ABTestVariant[]
-  /**
-   * Default variant to use when no variant is specified
-   */
-  defaultVariant: string
-  /**
-   * Whether to fallback to default variant when content is not available
-   */
-  fallback?: boolean
-  /**
-   * Analytics integration configuration
-   */
-  analytics?: {
-    /**
-     * PostHog API key
-     */
-    postHogApiKey?: string
-    /**
-     * Custom tracking function
-     */
-    trackEvent?: (event: {
-      variant: string
-      userId?: string
-      properties?: Record<string, any>
-    }) => void
-  }
+  collections?: Partial<Record<CollectionSlug, true>>
+  disabled?: boolean
 }
 
-export const abTestingPlugin =
-  (pluginOptions: AbTestingPluginConfig) =>
+export const  =
+  (pluginOptions: Config) =>
   (config: Config): Config => {
-    // Set defaults
-    const options = {
-      enabled: true,
-      fallback: true,
-      ...pluginOptions,
+    if (!config.collections) {
+      config.collections = []
     }
 
-    // If plugin is disabled, return original config
-    if (options.enabled === false) {
+    config.collections.push({
+      slug: 'plugin-collection',
+      fields: [
+        {
+          name: 'id',
+          type: 'text',
+        },
+      ],
+    })
+
+    if (pluginOptions.collections) {
+      for (const collectionSlug in pluginOptions.collections) {
+        const collection = config.collections.find(
+          (collection) => collection.slug === collectionSlug,
+        )
+
+        if (collection) {
+          collection.fields.push({
+            name: 'addedByPlugin',
+            type: 'text',
+            admin: {
+              position: 'sidebar',
+            },
+          })
+        }
+      }
+    }
+
+    /**
+     * If the plugin is disabled, we still want to keep added collections/fields so the database schema is consistent which is important for migrations.
+     * If your plugin heavily modifies the database schema, you may want to remove this property.
+     */
+    if (pluginOptions.disabled) {
       return config
     }
 
-    // Add A/B testing to collections
-    if (options.collections && config.collections) {
-      config.collections = config.collections.map(collection => {
-        if (options.collections?.includes(collection.slug)) {
-          return {
-            ...collection,
-            fields: injectAbTestableIntoFields(collection.fields || [], options.variants),
-          }
-        }
-        return collection
-      })
+    if (!config.endpoints) {
+      config.endpoints = []
     }
 
-    // Add the A/B testing options to the Payload config
-    if (!config.globals) config.globals = {}
-    if (!config.globals.abTesting) {
-      config.globals.abTesting = options
+    if (!config.admin) {
+      config.admin = {}
     }
 
-    // Add middleware for API endpoints
-    if (!config.express) config.express = {}
-    if (!config.express.middleware) config.express.middleware = []
-    
-    config.express.middleware.push({
-      function: abTestingMiddleware(options),
+    if (!config.admin.components) {
+      config.admin.components = {}
+    }
+
+    if (!config.admin.components.beforeDashboard) {
+      config.admin.components.beforeDashboard = []
+    }
+
+    config.admin.components.beforeDashboard.push(
+      `/client#BeforeDashboardClient`,
+    )
+    config.admin.components.beforeDashboard.push(
+      `/rsc#BeforeDashboardServer`,
+    )
+
+    config.endpoints.push({
+      handler: () => {
+        return Response.json({ message: 'Hello from custom endpoint' })
+      },
+      method: 'get',
+      path: '/my-plugin-endpoint',
     })
 
-    // Add admin components for A/B testing UI
-    if (!config.admin) config.admin = {}
-    if (!config.admin.components) config.admin.components = {}
-    
-    // Add components to modify field UI
-    if (!config.admin.components.beforeField) config.admin.components.beforeField = []
-    config.admin.components.beforeField.push('ab-testing-plugin/client#BeforeFieldComponent')
-    
-    // Add components to provide variant switcher in admin
-    if (!config.admin.components.beforeNavLinks) config.admin.components.beforeNavLinks = []
-    config.admin.components.beforeNavLinks.push('ab-testing-plugin/client#VariantSwitcher')
+    const incomingOnInit = config.onInit
 
-    // Register custom endpoints for A/B testing
-    if (!config.endpoints) config.endpoints = []
-    
-    // Add endpoint to track conversions
-    config.endpoints.push({
-      path: '/api/ab-testing/track',
-      method: 'post',
-      handler: async (req, res) => {
-        const { variant, event, properties } = req.body;
-        const userId = req.user?.id || 'anonymous';
-        
-        // Track event with analytics provider if configured
-        if (options.analytics?.trackEvent) {
-          options.analytics.trackEvent({
-            variant,
-            userId,
-            properties: {
-              event,
-              ...properties,
-            },
-          });
-        }
-        
-        return res.status(200).json({ success: true });
-      },
-    });
+    config.onInit = async (payload) => {
+      // Ensure we are executing any existing onInit functions before running our own.
+      if (incomingOnInit) {
+        await incomingOnInit(payload)
+      }
+
+      const { totalDocs } = await payload.count({
+        collection: 'plugin-collection',
+        where: {
+          id: {
+            equals: 'seeded-by-plugin',
+          },
+        },
+      })
+
+      if (totalDocs === 0) {
+        await payload.create({
+          collection: 'plugin-collection',
+          data: {
+            id: 'seeded-by-plugin',
+          },
+        })
+      }
+    }
 
     return config
   }

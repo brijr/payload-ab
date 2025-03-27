@@ -19,13 +19,13 @@
       "@payload-config": [
         "./payload.config.ts"
       ],
-      "ab-testing-plugin": [
+      "": [
         "../src/index.ts"
       ],
-      "ab-testing-plugin/client": [
+      "/client": [
         "../src/exports/client.ts"
       ],
-      "ab-testing-plugin/rsc": [
+      "/rsc": [
         "../src/exports/rsc.ts"
       ]
     },
