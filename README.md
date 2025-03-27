@@ -55,8 +55,8 @@ export default buildConfig({
       // Optional PostHog configuration
       posthog: {
         apiKey: process.env.POSTHOG_API_KEY,
-        host: 'https://app.posthog.com' // Optional, defaults to app.posthog.com
-      }
+        host: 'https://app.posthog.com', // Optional, defaults to app.posthog.com
+      },
     }),
   ],
 })
@@ -91,13 +91,13 @@ import posthog from 'posthog-js'
 
 // Initialize PostHog
 posthog.init('your-project-api-key', {
-  api_host: 'https://app.posthog.com'
+  api_host: 'https://app.posthog.com',
 })
 
 const MyComponent = ({ document }) => {
   // Get the appropriate variant based on PostHog feature flag
   const content = getABTestVariant(document, posthog)
-  
+
   return (
     <div>
       <h1>{content.title}</h1>
@@ -116,10 +116,10 @@ import { cookies } from 'next/headers'
 export default async function Page({ params }) {
   // Fetch your document from Payload
   const document = await fetchDocument(params.id)
-  
+
   // Get the appropriate variant based on cookies
   const content = await getServerSideABVariant(document, cookies())
-  
+
   return (
     <div>
       <h1>{content.title}</h1>
@@ -218,3 +218,5 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 MIT
+
+Created by [Bridger](https://brider.to).
