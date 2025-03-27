@@ -156,60 +156,21 @@ export const abTestingPlugin =
                 className: 'ab-variant-group',
                 description: 'Configure your A/B testing variant content here',
               },
-              fields: variantFields.map((field) => {
-                const fieldCopy = { ...field }
-                if ('name' in fieldCopy && 'type' in fieldCopy) {
-                  const fieldTypes = [
-                    'text',
-                    'textarea',
-                    'number',
-                    'email',
-                    'code',
-                    'date',
-                    'upload',
-                    'relationship',
-                    'select',
-                  ]
-
-                  if (fieldTypes.includes(fieldCopy.type as string)) {
-                    ;(fieldCopy as FieldWithRequired).required = false
-                  }
-                }
-                return fieldCopy
-              }),
+              fields: variantFields,
               label: 'Variant Content',
             } as GroupField,
           ],
           label: 'A/B Testing Variant',
         }
 
-        // Create a new collection with the A/B variant fields
+        // Add the A/B testing fields to the collection WITHOUT modifying existing fields
+        // This is the safest approach to prevent data loss
         return {
           ...collection,
           fields: [
-            ...(collection.fields || []).map((field) => {
-              const fieldCopy = { ...field }
-              if ('name' in fieldCopy && 'type' in fieldCopy) {
-                const fieldTypes = [
-                  'text',
-                  'textarea',
-                  'number',
-                  'email',
-                  'code',
-                  'date',
-                  'upload',
-                  'relationship',
-                  'select',
-                ]
-
-                if (fieldTypes.includes(fieldCopy.type as string)) {
-                  ;(fieldCopy as FieldWithRequired).required = false
-                }
-              }
-              return fieldCopy
-            }),
-            enableABTestingField,
-            abVariantField,
+            ...(collection.fields || []), // Keep all existing fields exactly as they are
+            enableABTestingField, // Add the toggle field
+            abVariantField, // Add the variant field
           ],
         }
       }
