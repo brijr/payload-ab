@@ -38,6 +38,21 @@ export default buildConfig({
           type: 'richText',
           required: true,
         },
+        {
+          name: 'excerpt',
+          type: 'textarea',
+          required: false,
+        },
+        {
+          name: 'author',
+          type: 'text',
+          required: false,
+        },
+        {
+          name: 'publishedDate',
+          type: 'date',
+          required: false,
+        },
       ],
     },
     {
@@ -51,6 +66,16 @@ export default buildConfig({
         {
           name: 'content',
           type: 'richText',
+          required: true,
+        },
+        {
+          name: 'metaDescription',
+          type: 'textarea',
+          required: false,
+        },
+        {
+          name: 'slug',
+          type: 'text',
           required: true,
         },
       ],
@@ -73,7 +98,16 @@ export default buildConfig({
   },
   plugins: [
     abTestingPlugin({
-      collections: ['posts', 'pages'], // Apply A/B testing to these collections
+      collections: {
+        // For posts, only include title and content in the A/B variant
+        posts: {
+          fields: ['title', 'content'],
+        },
+        // For pages, include all fields except metaDescription
+        pages: {
+          excludeFields: ['id', 'createdAt', 'updatedAt', 'metaDescription'],
+        },
+      },
     }),
   ],
   secret: process.env.PAYLOAD_SECRET || 'test-secret_key',

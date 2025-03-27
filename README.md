@@ -5,6 +5,7 @@ A plugin for Payload CMS 3.x that adds A/B testing capabilities to your collecti
 ## Features
 
 - Add A/B testing variant fields to specific collections
+- Selectively include or exclude fields in your variants
 - Optional variants - if no variant is provided, the default content is used
 - Designed to work with PostHog for analytics tracking
 - TypeScript support with full type definitions
@@ -26,6 +27,8 @@ yarn add payload-ab
 
 ### 1. Add the plugin to your Payload config
 
+#### Basic usage with array of collections
+
 ```typescript
 import { buildConfig } from 'payload'
 import { abTestingPlugin } from 'payload-ab'
@@ -42,11 +45,40 @@ export default buildConfig({
 })
 ```
 
+#### Advanced usage with field selection
+
+```typescript
+import { buildConfig } from 'payload'
+import { abTestingPlugin } from 'payload-ab'
+
+export default buildConfig({
+  collections: [
+    // Your collections
+  ],
+  plugins: [
+    abTestingPlugin({
+      collections: {
+        // For posts, only include title and content in the A/B variant
+        posts: {
+          fields: ['title', 'content'],
+        },
+        // For pages, include all fields except metaDescription
+        pages: {
+          excludeFields: ['id', 'createdAt', 'updatedAt', 'metaDescription'],
+        },
+        // Disable A/B testing for a specific collection
+        products: {
+          enabled: false,
+        },
+      },
+    }),
+  ],
+})
+```
+
 ### 2. Create content with variants
 
-Once installed, you'll see an "A/B Variant" field group in your specified collections. This group contains:
-
-- `content`: A rich text field for your variant content
+Once installed, you'll see an "A/B Variant" field group in your specified collections. This group contains all the fields you've configured for A/B testing.
 
 You can leave this empty for any document where you don't want to run an A/B test.
 
@@ -88,8 +120,9 @@ import posthog from 'posthog-js'
 import { useEffect } from 'react'
 
 export default function Page({ page }) {
-  const isVariant = Boolean(page.abVariant?.content)
-  const variantType = isVariant ? 'variant' : 'default'
+  // Check if this page has a variant
+  const hasVariant = Boolean(page.abVariant)
+  const variantType = hasVariant ? 'variant' : 'default'
   
   useEffect(() => {
     // Initialize PostHog if not already done
@@ -108,12 +141,18 @@ export default function Page({ page }) {
   // Render the appropriate content
   return (
     <div>
-      {isVariant ? (
+      {hasVariant ? (
         // Render variant content
-        <div>{page.abVariant.content}</div>
+        <div>
+          <h1>{page.abVariant.title}</h1>
+          <div>{page.abVariant.content}</div>
+        </div>
       ) : (
         // Render default content
-        <div>{page.content}</div>
+        <div>
+          <h1>{page.title}</h1>
+          <div>{page.content}</div>
+        </div>
       )}
     </div>
   )
@@ -126,8 +165,18 @@ The plugin accepts the following options:
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
-| `collections` | `string[]` | Array of collection slugs to add A/B testing fields to | Required |
+| `collections` | `string[]` or `Record<string, ABCollectionConfig>` | Array of collection slugs or object with detailed configuration | Required |
 | `disabled` | `boolean` | Disable the plugin without removing it | `false` |
+
+### Collection Configuration
+
+When using the object format for collections, each collection can have the following options:
+
+| Option | Type | Description | Default |
+|--------|------|-------------|---------|
+| `enabled` | `boolean` | Enable or disable A/B testing for this collection | `true` |
+| `fields` | `string[]` | Fields to include in the A/B variant | All fields except system fields |
+| `excludeFields` | `string[]` | Fields to exclude from the A/B variant (only used when `fields` is not specified) | `['id', 'createdAt', 'updatedAt']` |
 
 ## Development
 
