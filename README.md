@@ -26,6 +26,22 @@ pnpm add payload-ab
 yarn add payload-ab
 ```
 
+## Important Note for Existing Projects
+
+If you're adding this plugin to a project with existing data, you may encounter database migration errors like:
+
+```
+error: column "ab_variant_content" of relation "your_collection" contains null values
+```
+
+This happens because the database tries to add non-nullable fields to existing records. To resolve this:
+
+1. **Back up your database** before running migrations
+2. Use a migration tool like Payload's `migrate:create` to create a migration that adds nullable fields
+3. Or manually add default values to existing records before applying the schema changes
+
+For PostgreSQL users, you can also modify the migration to include `DEFAULT NULL` for the new columns.
+
 ## Detailed Setup Guide
 
 ### 1. Add the plugin to your Payload config

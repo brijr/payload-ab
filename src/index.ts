@@ -1,4 +1,10 @@
-import type { CollectionConfig, Config, Field } from 'payload'
+import type { CollectionConfig, Config, Field, GroupField } from 'payload'
+
+// Define a type for fields that can have a required property
+type FieldWithRequired = {
+  required?: boolean
+  type: string
+} & Field
 
 export interface ABTestingPluginOptions {
   /**
@@ -93,6 +99,35 @@ export const abTestingPlugin =
           })
         }
 
+        // Make sure all fields in the variant are nullable in the database
+        const variantFields = contentFields.map((field: Field) => {
+          // Create a copy of the field
+          const fieldCopy = { ...field }
+
+          // For fields that can have a required property, make sure it's false
+          if ('name' in fieldCopy && 'type' in fieldCopy) {
+            // Only modify fields that can have a required property
+            const fieldTypes = [
+              'text',
+              'textarea',
+              'number',
+              'email',
+              'code',
+              'date',
+              'upload',
+              'relationship',
+              'select',
+            ]
+
+            if (fieldTypes.includes(fieldCopy.type as string)) {
+              // Type assertion to FieldWithRequired since we've verified it's a field type that can have required
+              ;(fieldCopy as FieldWithRequired).required = false
+            }
+          }
+
+          return fieldCopy
+        })
+
         // Create a collapsible field to contain the A/B variant
         const abVariantField: Field = {
           type: 'collapsible',
@@ -109,9 +144,9 @@ export const abTestingPlugin =
                 className: 'ab-variant-group',
                 description: 'Leave empty to use the default content',
               },
-              fields: contentFields,
+              fields: variantFields,
               label: 'Variant Content',
-            } as Field,
+            } as GroupField,
           ],
           label: 'A/B Testing Variant',
         }
