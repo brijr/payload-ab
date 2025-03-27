@@ -1,6 +1,9 @@
-# PayloadCMS A/B Testing Plugin
+# payload-ab
 
-A plugin for PayloadCMS that enables A/B testing functionality for your content. This plugin allows content editors to create multiple variants of content and dynamically serves different variants to users.
+A PayloadCMS plugin that enables A/B testing functionality for your content. This plugin allows content editors to create multiple variants of content and dynamically serves different variants to users.
+
+[![NPM](https://img.shields.io/npm/v/payload-ab)](https://www.npmjs.com/package/payload-ab)
+[![GitHub](https://img.shields.io/github/stars/brijr/payload-ab?style=social)](https://github.com/brijr/payload-ab)
 
 ## Features
 
@@ -13,11 +16,11 @@ A plugin for PayloadCMS that enables A/B testing functionality for your content.
 ## Installation
 
 ```bash
-npm install ab-testing-plugin
+npm install payload-ab
 # or
-yarn add ab-testing-plugin
+yarn add payload-ab
 # or
-pnpm add ab-testing-plugin
+pnpm add payload-ab
 ```
 
 ## Usage
@@ -26,7 +29,7 @@ Add the plugin to your Payload config:
 
 ```typescript
 import { buildConfig } from 'payload/config';
-import { abTestingPlugin } from 'ab-testing-plugin';
+import { abTestingPlugin } from 'payload-ab';
 
 export default buildConfig({
   // ... your config

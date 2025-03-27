@@ -1,7 +1,7 @@
 {
-  "name": "ab-testing-plugin",
-  "version": "1.0.0",
-  "description": "A blank template to get started with Payload 3.0",
+  "name": "payload-ab",
+  "version": "0.1.0",
+  "description": "Payload AB Testing Plugin using PostHog",
   "license": "MIT",
   "type": "module",
   "exports": {
