@@ -156,7 +156,27 @@ export const abTestingPlugin =
                 className: 'ab-variant-group',
                 description: 'Configure your A/B testing variant content here',
               },
-              fields: variantFields,
+              fields: variantFields.map((field) => {
+                const fieldCopy = { ...field }
+                if ('name' in fieldCopy && 'type' in fieldCopy) {
+                  const fieldTypes = [
+                    'text',
+                    'textarea',
+                    'number',
+                    'email',
+                    'code',
+                    'date',
+                    'upload',
+                    'relationship',
+                    'select',
+                  ]
+
+                  if (fieldTypes.includes(fieldCopy.type as string)) {
+                    ;(fieldCopy as FieldWithRequired).required = false
+                  }
+                }
+                return fieldCopy
+              }),
               label: 'Variant Content',
             } as GroupField,
           ],
@@ -166,7 +186,31 @@ export const abTestingPlugin =
         // Create a new collection with the A/B variant fields
         return {
           ...collection,
-          fields: [...(collection.fields || []), enableABTestingField, abVariantField],
+          fields: [
+            ...(collection.fields || []).map((field) => {
+              const fieldCopy = { ...field }
+              if ('name' in fieldCopy && 'type' in fieldCopy) {
+                const fieldTypes = [
+                  'text',
+                  'textarea',
+                  'number',
+                  'email',
+                  'code',
+                  'date',
+                  'upload',
+                  'relationship',
+                  'select',
+                ]
+
+                if (fieldTypes.includes(fieldCopy.type as string)) {
+                  ;(fieldCopy as FieldWithRequired).required = false
+                }
+              }
+              return fieldCopy
+            }),
+            enableABTestingField,
+            abVariantField,
+          ],
         }
       }
       return collection
