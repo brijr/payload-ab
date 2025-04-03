@@ -23,23 +23,7 @@ pnpm add payload-ab
 yarn add payload-ab
 ```
 
-## Important Note for Existing Projects
-
-If you're adding this plugin to a project with existing data, you may encounter database migration errors like:
-
-```
-error: column "ab_variant_content" of relation "your_collection" contains null values
-```
-
-This happens because the database tries to add non-nullable fields to existing records. To resolve this:
-
-1. **Back up your database** before running migrations
-2. Use a migration tool like Payload's `migrate:create` to create a migration that adds nullable fields
-3. Or manually add default values to existing records before applying the schema changes
-
-For PostgreSQL users, you can also modify the migration to include `DEFAULT NULL` for the new columns.
-
-## Detailed Setup Guide
+## Quick Start
 
 ### 1. Add the plugin to your Payload config
 
@@ -62,26 +46,7 @@ export default buildConfig({
 })
 ```
 
-### 2. Advanced Configuration
-
-For more granular control, you can specify which fields to include or exclude:
-
-```typescript
-abTestingPlugin({
-  collections: {
-    // For posts, only include title and content in the A/B variant
-    posts: {
-      fields: ['title', 'content'],
-    },
-    // For pages, include all fields except metaDescription
-    pages: {
-      excludeFields: ['id', 'createdAt', 'updatedAt', 'metaDescription'],
-    },
-  },
-})
-```
-
-### 3. Using A/B Testing with PostHog
+### 2. Using A/B Testing in your frontend
 
 #### Client-side (React)
 
@@ -133,22 +98,12 @@ export default async function Page({ params }) {
 
 1. In the Payload admin, navigate to any collection with A/B testing enabled
 2. Go to the "A/B Testing" tab
-3. Toggle "Enable A/B Testing"
-4. Optionally set a PostHog Feature Flag Key (or one will be auto-generated)
-5. Modify your variant content as needed (all content is automatically copied from the main content when you first enable A/B testing)
+3. Toggle "Enable A/B Testing" to start creating your variant
+4. Fill in your variant content (all fields are optional)
+5. Optionally set a PostHog Feature Flag Key (or one will be auto-generated)
 6. Save the document
 
-## PostHog Integration
-
-This plugin integrates with PostHog to provide analytics and feature flag functionality:
-
-1. **Feature Flags**: Each A/B test uses a PostHog feature flag to determine which variant to show
-2. **Analytics Events**: The plugin automatically tracks which variant is shown to users
-3. **Experiment Results**: View experiment results in PostHog's experimentation dashboard
-
-For more information on setting up experiments in PostHog, see the [PostHog documentation](https://posthog.com/docs/experiments/installation).
-
-## Advanced Configuration Options
+## Advanced Configuration
 
 ### Plugin Options
 
@@ -166,6 +121,33 @@ When using the object format for collections, each collection can have the follo
 | `enabled`       | `boolean`  | Enable or disable A/B testing for this collection                                 | `true`                             |
 | `fields`        | `string[]` | Fields to include in the A/B variant                                              | All fields except system fields    |
 | `excludeFields` | `string[]` | Fields to exclude from the A/B variant (only used when `fields` is not specified) | `['id', 'createdAt', 'updatedAt']` |
+
+Example of advanced configuration:
+
+```typescript
+abTestingPlugin({
+  collections: {
+    // For posts, only include title and content in the A/B variant
+    posts: {
+      fields: ['title', 'content'],
+    },
+    // For pages, include all fields except metaDescription
+    pages: {
+      excludeFields: ['id', 'createdAt', 'updatedAt', 'metaDescription'],
+    },
+  },
+})
+```
+
+## PostHog Integration
+
+This plugin integrates with PostHog to provide analytics and feature flag functionality:
+
+1. **Feature Flags**: Each A/B test uses a PostHog feature flag to determine which variant to show
+2. **Analytics Events**: The plugin automatically tracks which variant is shown to users
+3. **Experiment Results**: View experiment results in PostHog's experimentation dashboard
+
+For more information on setting up experiments in PostHog, see the [PostHog documentation](https://posthog.com/docs/experiments/installation).
 
 ## Best Practices
 
