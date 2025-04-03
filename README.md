@@ -23,6 +23,68 @@ pnpm add payload-ab
 yarn add payload-ab
 ```
 
+## PostHog Integration
+
+This plugin integrates with PostHog to provide analytics and feature flag functionality:
+
+1. **Feature Flags**: Each A/B test uses a PostHog feature flag to determine which variant to show
+2. **Analytics Events**: The plugin automatically tracks which variant is shown to users
+3. **Experiment Results**: View experiment results in PostHog's experimentation dashboard
+
+### Setting up PostHog
+
+1. Go to your PostHog dashboard
+2. Navigate to "Feature Flags"
+3. Create a new feature flag:
+   - Name: `ab-test-{your-collection}-{your-document-id}`
+   - Key: Use the auto-generated key from your Payload document or create a custom one
+   - Rollout percentage: 50% (for a 50/50 split)
+   - Variants: Add two variants named "control" and "variant"
+
+For more information on setting up experiments in PostHog, see the [PostHog documentation](https://posthog.com/docs/experiments/installation).
+
+## Testing Your A/B Tests
+
+### Development Testing
+
+1. Create a test document in Payload with A/B testing enabled
+2. Set up your variants in the admin panel
+3. Use PostHog's feature flag override in development:
+
+```typescript
+// In your development environment
+posthog.featureFlags.override({
+  'ab-test-posts-123': 'variant' // Replace with your feature flag key
+})
+```
+
+### Browser Testing
+
+1. Open your site in two different browsers or incognito windows
+2. You should see different variants in each window
+3. Use PostHog's debug mode to verify the feature flag is working:
+
+```typescript
+posthog.debug(true)
+```
+
+### Debugging Tips
+
+```typescript
+// Check which variant is active
+const variant = posthog.getFeatureFlag('ab-test-posts-123')
+console.log('Current variant:', variant)
+
+// Force a specific variant (development only)
+posthog.featureFlags.override({
+  'ab-test-posts-123': 'control'
+})
+
+// Check if feature flag is enabled
+const isEnabled = posthog.isFeatureEnabled('ab-test-posts-123')
+console.log('Feature flag enabled:', isEnabled)
+```
+
 ## Quick Start
 
 ### 1. Add the plugin to your Payload config
@@ -138,16 +200,6 @@ abTestingPlugin({
   },
 })
 ```
-
-## PostHog Integration
-
-This plugin integrates with PostHog to provide analytics and feature flag functionality:
-
-1. **Feature Flags**: Each A/B test uses a PostHog feature flag to determine which variant to show
-2. **Analytics Events**: The plugin automatically tracks which variant is shown to users
-3. **Experiment Results**: View experiment results in PostHog's experimentation dashboard
-
-For more information on setting up experiments in PostHog, see the [PostHog documentation](https://posthog.com/docs/experiments/installation).
 
 ## Best Practices
 
