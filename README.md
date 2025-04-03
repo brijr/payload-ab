@@ -135,7 +135,7 @@ export default async function Page({ params }) {
 2. Go to the "A/B Testing" tab
 3. Toggle "Enable A/B Testing"
 4. Optionally set a PostHog Feature Flag Key (or one will be auto-generated)
-5. Create your variant content
+5. Modify your variant content as needed (all content is automatically copied from the main content when you first enable A/B testing)
 6. Save the document
 
 ## PostHog Integration

@@ -1,10 +1,48 @@
-import type { CollectionConfig, Config, Field, GroupField } from 'payload'
+import type {
+  AfterErrorHook,
+  CollectionConfig,
+  Config,
+  DescriptionFunction,
+  Field,
+  GroupField,
+} from 'payload'
 
 // Define a type for fields that can have a required property
 type FieldWithRequired = {
   required?: boolean
   type: string
 } & Field
+
+// Define hook argument types
+interface BeforeChangeHookArgs {
+  collection?: {
+    slug: string
+  }
+  data: {
+    [key: string]: unknown
+    abVariant?: Record<string, unknown>
+    enableABTesting?: boolean
+  }
+  originalDoc?: {
+    [key: string]: unknown
+    enableABTesting?: boolean
+  }
+}
+
+// Define the hook type
+type BeforeChangeHook = (args: BeforeChangeHookArgs) => Promise<Record<string, unknown>>
+
+// Define hooks type
+interface Hooks {
+  afterError?: AfterErrorHook[]
+  beforeChange?: BeforeChangeHook[]
+}
+
+// Define config type with hooks
+interface ConfigWithHooks extends Omit<Config, 'hooks'> {
+  collections?: CollectionConfig[]
+  hooks?: Hooks
+}
 
 export interface ABTestingPluginOptions {
   /**
@@ -69,8 +107,8 @@ export interface ABCollectionConfig {
 export const abTestingPlugin =
   (pluginOptions: ABTestingPluginOptions) =>
   (incomingConfig: Config): Config => {
-    // Create a copy of the incoming config
-    const config = { ...incomingConfig }
+    // Create a copy of the incoming config with proper typing
+    const config = { ...incomingConfig } as ConfigWithHooks
 
     // Ensure collections exist
     if (!config.collections) {
@@ -80,6 +118,13 @@ export const abTestingPlugin =
     // If the plugin is disabled, return the config as is
     if (pluginOptions.disabled) {
       return config
+    }
+
+    // Validate PostHog configuration if provided
+    if (pluginOptions.posthog?.apiKey) {
+      if (!pluginOptions.posthog.apiKey.startsWith('phx_')) {
+        throw new Error('Invalid PostHog API key format. PostHog API keys should start with "phx_"')
+      }
     }
 
     // Normalize collections config to object format
@@ -96,6 +141,9 @@ export const abTestingPlugin =
         collectionsConfig[slug] = { enabled: true, ...config }
       })
     }
+
+    // Track collection field mappings to use in hooks
+    const collectionFieldMappings: Record<string, string[]> = {}
 
     // Map over the collections in the config
     const modifiedCollections = config.collections.map((collection: CollectionConfig) => {
@@ -152,6 +200,13 @@ export const abTestingPlugin =
           return fieldCopy
         })
 
+        // Store field names for this collection to use in hooks
+        if (collection.slug) {
+          collectionFieldMappings[collection.slug] = contentFields
+            .filter((field) => 'name' in field)
+            .map((field) => field.name)
+        }
+
         // Add a toggle field to enable/disable A/B testing for this document
         const enableABTestingField: Field = {
           name: 'enableABTesting',
@@ -170,23 +225,36 @@ export const abTestingPlugin =
             name: 'posthogFeatureFlagKey',
             type: 'text',
             admin: {
-              condition: (data) => Boolean(data?.enableABTesting),
-              description:
-                'PostHog feature flag key for this experiment (auto-generated if left empty)',
+              condition: (data) => data?.enableABTesting === true,
+              description: ((args: {
+                data: { enableABTesting?: boolean }
+                t: (key: string) => string
+              }) =>
+                args.data?.enableABTesting
+                  ? 'PostHog feature flag key for this experiment (auto-generated if left empty)'
+                  : 'Enable A/B testing above to configure PostHog integration') as unknown as DescriptionFunction,
               position: 'sidebar',
             },
             label: 'PostHog Feature Flag Key',
+            required: false,
           },
           {
             name: 'posthogVariantName',
             type: 'text',
             admin: {
-              condition: (data) => Boolean(data?.enableABTesting),
-              description: 'Name of this variant in PostHog (defaults to "variant")',
+              condition: (data) => data?.enableABTesting === true,
+              description: ((args: {
+                data: { enableABTesting?: boolean }
+                t: (key: string) => string
+              }) =>
+                args.data?.enableABTesting
+                  ? 'Name of this variant in PostHog (defaults to "variant")'
+                  : 'Enable A/B testing above to configure PostHog integration') as unknown as DescriptionFunction,
               position: 'sidebar',
             },
             defaultValue: 'variant',
             label: 'Variant Name',
+            required: false,
           },
         ]
 
@@ -201,7 +269,8 @@ export const abTestingPlugin =
             },
             // Add a new tab for A/B Testing
             {
-              description: 'Configure A/B testing variants for this content',
+              description:
+                'Configure A/B testing variants for this content. Enable A/B testing to start the experiment.',
               fields: [
                 enableABTestingField,
                 ...posthogFields,
@@ -210,8 +279,14 @@ export const abTestingPlugin =
                   type: 'group',
                   admin: {
                     className: 'ab-variant-group',
-                    condition: (data) => Boolean(data?.enableABTesting),
-                    description: 'Configure your A/B testing variant content here',
+                    condition: (data) => data?.enableABTesting === true,
+                    description: ((args: {
+                      data: { enableABTesting?: boolean }
+                      t: (key: string) => string
+                    }) =>
+                      args.data?.enableABTesting
+                        ? 'Configure your A/B testing variant content here'
+                        : 'Enable A/B testing above to start configuring your variant') as unknown as DescriptionFunction,
                   },
                   fields: variantFields,
                   label: 'Variant Content',
@@ -242,6 +317,66 @@ export const abTestingPlugin =
 
     // Update the config with the modified collections
     config.collections = modifiedCollections
+
+    // Add hooks to copy content to variant when A/B testing is enabled
+    if (!config.hooks) {
+      config.hooks = {}
+    }
+
+    // Add global beforeChange hook
+    if (!config.hooks.beforeChange) {
+      config.hooks.beforeChange = []
+    }
+
+    // Add collection-specific hooks instead of a global one
+    Object.keys(collectionsConfig).forEach((collectionSlug) => {
+      // Skip if collection is not enabled
+      const collectionConfig = collectionsConfig[collectionSlug]
+      if (collectionConfig?.enabled === false) {
+        return
+      }
+
+      // Find the collection to add the hook to
+      const collection = config.collections?.find((c) => c.slug === collectionSlug)
+      if (!collection) {
+        return
+      }
+
+      // Initialize hooks for this collection if needed
+      if (!collection.hooks) {
+        collection.hooks = {}
+      }
+
+      if (!collection.hooks.beforeChange) {
+        collection.hooks.beforeChange = []
+      }
+
+      // Add the hook for this specific collection
+      const copyToVariantHook: BeforeChangeHook = (args: BeforeChangeHookArgs) => {
+        try {
+          const { data } = args
+
+          // Initialize abVariant if not already present
+          if (!data.abVariant) {
+            data.abVariant = {}
+          }
+
+          // If A/B testing is disabled, clear the variant data
+          if (data.enableABTesting === false) {
+            data.abVariant = {}
+          }
+
+          return Promise.resolve(data)
+        } catch (error) {
+          // Log error but don't throw to prevent breaking the save operation
+          console.error(`[A/B Plugin] Error in copyToVariantHook for ${collectionSlug}:`, error)
+          return Promise.resolve(args.data)
+        }
+      }
+
+      // Add the hook to this collection
+      collection.hooks.beforeChange.push(copyToVariantHook)
+    })
 
     return config
   }
