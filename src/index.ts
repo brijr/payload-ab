@@ -158,6 +158,7 @@ export const abTestingPlugin =
           type: 'checkbox',
           admin: {
             description: 'Check this box to create an A/B testing variant for this document',
+            position: 'sidebar',
           },
           defaultValue: false,
           label: 'Enable A/B Testing',
@@ -172,6 +173,7 @@ export const abTestingPlugin =
               condition: (data) => Boolean(data?.enableABTesting),
               description:
                 'PostHog feature flag key for this experiment (auto-generated if left empty)',
+              position: 'sidebar',
             },
             label: 'PostHog Feature Flag Key',
           },
@@ -181,6 +183,7 @@ export const abTestingPlugin =
             admin: {
               condition: (data) => Boolean(data?.enableABTesting),
               description: 'Name of this variant in PostHog (defaults to "variant")',
+              position: 'sidebar',
             },
             defaultValue: 'variant',
             label: 'Variant Name',
