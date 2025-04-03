@@ -1,6 +1,6 @@
 {
   "name": "payload-ab",
-  "version": "0.1.8",
+  "version": "0.1.81",
   "description": "Payload CMS plugin for A/B testing with PostHog",
   "license": "MIT",
   "type": "module",
