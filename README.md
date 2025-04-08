@@ -100,7 +100,7 @@ export default buildConfig({
       collections: ['posts', 'pages'], // Collections to enable A/B testing for
       // Optional PostHog configuration
       posthog: {
-        apiKey: process.env.POSTHOG_API_KEY,
+        apiKey: process.env.NEXT_PUBLIC_POSTHOG_KEY,
         host: 'https://app.posthog.com', // Optional, defaults to app.posthog.com
       },
     }),
@@ -109,30 +109,6 @@ export default buildConfig({
 ```
 
 ### 2. Using A/B Testing in your frontend
-
-#### Client-side (React)
-
-```tsx
-import { getABTestVariant } from 'payload-ab/client'
-import posthog from 'posthog-js'
-
-// Initialize PostHog
-posthog.init('your-project-api-key', {
-  api_host: 'https://app.posthog.com',
-})
-
-const MyComponent = ({ document }) => {
-  // Get the appropriate variant based on PostHog feature flag
-  const content = getABTestVariant(document, posthog)
-
-  return (
-    <div>
-      <h1>{content.title}</h1>
-      <div>{content.content}</div>
-    </div>
-  )
-}
-```
 
 #### Server-side (Next.js App Router)
 
@@ -146,6 +122,30 @@ export default async function Page({ params }) {
 
   // Get the appropriate variant based on cookies
   const content = await getServerSideABVariant(document, cookies())
+
+  return (
+    <div>
+      <h1>{content.title}</h1>
+      <div>{content.content}</div>
+    </div>
+  )
+}
+```
+
+#### Client-side (React)
+
+```tsx
+import { getABTestVariant } from 'payload-ab/client'
+import posthog from 'posthog-js'
+
+// Initialize PostHog
+posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
+  api_host: 'https://app.posthog.com',
+})
+
+const MyComponent = ({ document }) => {
+  // Get the appropriate variant based on PostHog feature flag
+  const content = getABTestVariant(document, posthog)
 
   return (
     <div>
