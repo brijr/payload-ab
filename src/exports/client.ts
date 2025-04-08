@@ -1,5 +1,3 @@
-export { BeforeDashboardClient } from '../components/BeforeDashboardClient.js'
-
 /**
  * Helper function to determine which content variant to show based on PostHog feature flag
  * @param document The document from Payload CMS containing A/B testing data

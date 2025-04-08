@@ -1,5 +1,3 @@
-export { BeforeDashboardServer } from '../components/BeforeDashboardServer.jsx'
-
 /**
  * Server-side helper for determining which A/B test variant to serve
  * For use in Next.js App Router with React Server Components
