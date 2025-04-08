@@ -122,8 +122,8 @@ export const abTestingPlugin =
 
     // Validate PostHog configuration if provided
     if (pluginOptions.posthog?.apiKey) {
-      if (!pluginOptions.posthog.apiKey.startsWith('phx_')) {
-        throw new Error('Invalid PostHog API key format. PostHog API keys should start with "phx_"')
+      if (!pluginOptions.posthog.apiKey.startsWith('phc_')) {
+        throw new Error('Invalid PostHog API key format. PostHog API keys should start with "phc_"')
       }
     }
 

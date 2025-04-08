@@ -54,7 +54,7 @@ For more information on setting up experiments in PostHog, see the [PostHog docu
 ```typescript
 // In your development environment
 posthog.featureFlags.override({
-  'ab-test-posts-123': 'variant' // Replace with your feature flag key
+  'ab-test-posts-123': 'variant', // Replace with your feature flag key
 })
 ```
 
@@ -77,7 +77,7 @@ console.log('Current variant:', variant)
 
 // Force a specific variant (development only)
 posthog.featureFlags.override({
-  'ab-test-posts-123': 'control'
+  'ab-test-posts-123': 'control',
 })
 
 // Check if feature flag is enabled
