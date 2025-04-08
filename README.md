@@ -43,48 +43,6 @@ This plugin integrates with PostHog to provide analytics and feature flag functi
 
 For more information on setting up experiments in PostHog, see the [PostHog documentation](https://posthog.com/docs/experiments/installation).
 
-## Testing Your A/B Tests
-
-### Development Testing
-
-1. Create a test document in Payload with A/B testing enabled
-2. Set up your variants in the admin panel
-3. Use PostHog's feature flag override in development:
-
-```typescript
-// In your development environment
-posthog.featureFlags.override({
-  'ab-test-posts-123': 'variant', // Replace with your feature flag key
-})
-```
-
-### Browser Testing
-
-1. Open your site in two different browsers or incognito windows
-2. You should see different variants in each window
-3. Use PostHog's debug mode to verify the feature flag is working:
-
-```typescript
-posthog.debug(true)
-```
-
-### Debugging Tips
-
-```typescript
-// Check which variant is active
-const variant = posthog.getFeatureFlag('ab-test-posts-123')
-console.log('Current variant:', variant)
-
-// Force a specific variant (development only)
-posthog.featureFlags.override({
-  'ab-test-posts-123': 'control',
-})
-
-// Check if feature flag is enabled
-const isEnabled = posthog.isFeatureEnabled('ab-test-posts-123')
-console.log('Feature flag enabled:', isEnabled)
-```
-
 ## Quick Start
 
 ### 1. Add the plugin to your Payload config
@@ -221,6 +179,48 @@ abTestingPlugin({
 
 **Issue**: Changes to the A/B variant are not reflecting on the frontend.
 **Solution**: Ensure you're correctly merging the variant data with the default data in your frontend code.
+
+## Testing Your A/B Tests
+
+### Development Testing
+
+1. Create a test document in Payload with A/B testing enabled
+2. Set up your variants in the admin panel
+3. Use PostHog's feature flag override in development:
+
+```typescript
+// In your development environment
+posthog.featureFlags.override({
+  'ab-test-posts-123': 'variant', // Replace with your feature flag key
+})
+```
+
+### Browser Testing
+
+1. Open your site in two different browsers or incognito windows
+2. You should see different variants in each window
+3. Use PostHog's debug mode to verify the feature flag is working:
+
+```typescript
+posthog.debug(true)
+```
+
+### Debugging Tips
+
+```typescript
+// Check which variant is active
+const variant = posthog.getFeatureFlag('ab-test-posts-123')
+console.log('Current variant:', variant)
+
+// Force a specific variant (development only)
+posthog.featureFlags.override({
+  'ab-test-posts-123': 'control',
+})
+
+// Check if feature flag is enabled
+const isEnabled = posthog.isFeatureEnabled('ab-test-posts-123')
+console.log('Feature flag enabled:', isEnabled)
+```
 
 ## Development
 
