@@ -1,4 +1,4 @@
-export { BeforeDashboardServer } from '../components/BeforeDashboardServer.js'
+export { BeforeDashboardServer } from '../components/BeforeDashboardServer.jsx'
 
 /**
  * Server-side helper for determining which A/B test variant to serve
@@ -31,10 +31,9 @@ export const getServerSideABVariant = async <
     // Check for existing PostHog distinct_id cookie
     const distinctIdCookie = await Promise.resolve(cookies.get('ph_distinct_id'))
 
-    if (!distinctIdCookie?.value) {
-      // If no PostHog cookie exists, return original document
-      return document
-    }
+    // Use the cookie value or generate a test ID for development
+    const distinctId =
+      distinctIdCookie?.value || `test_${Math.random().toString(36).substring(2, 15)}`
 
     // Simple hash function to determine variant assignment
     // This is a basic implementation - PostHog would handle this more robustly
@@ -49,7 +48,7 @@ export const getServerSideABVariant = async <
     }
 
     // Create a hash based on the distinct_id and feature flag key
-    const hash = hashCode(`${distinctIdCookie.value}:${featureFlagKey}`)
+    const hash = hashCode(`${distinctId}:${featureFlagKey}`)
 
     // Determine if user should see variant (50/50 split)
     const showVariant = Math.abs(hash) % 2 === 0

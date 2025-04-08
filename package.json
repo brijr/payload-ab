@@ -1,6 +1,6 @@
 {
   "name": "payload-ab",
-  "version": "0.1.84",
+  "version": "0.2",
   "description": "Payload CMS plugin for A/B testing with PostHog",
   "license": "MIT",
   "type": "module",
@@ -15,10 +15,10 @@
       "types": "./dist/exports/client.d.ts",
       "default": "./dist/exports/client.js"
     },
-    "./rsc": {
-      "import": "./dist/exports/rsc.js",
-      "types": "./dist/exports/rsc.d.ts",
-      "default": "./dist/exports/rsc.js"
+    "./server": {
+      "import": "./dist/exports/server.js",
+      "types": "./dist/exports/server.d.ts",
+      "default": "./dist/exports/server.js"
     }
   },
   "main": "./dist/index.js",

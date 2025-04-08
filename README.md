@@ -70,23 +70,100 @@ export default buildConfig({
 
 #### Server-side (Next.js App Router)
 
+First, set up PostHog initialization in a client component:
+
 ```tsx
-import { getServerSideABVariant } from 'payload-ab/rsc'
+// components/PostHogInit.tsx
+'use client'
+
+import { useEffect } from 'react'
+import posthog from 'posthog-js'
+
+export default function PostHogInit() {
+  useEffect(() => {
+    // Initialize PostHog only on the client side
+    if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+      posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
+        api_host: 'https://app.posthog.com',
+        capture_pageview: true,
+        loaded: (posthog) => {
+          if (process.env.NODE_ENV === 'development') {
+            posthog.debug()
+          }
+        },
+      })
+    }
+  }, [])
+
+  return null
+}
+```
+
+Add it to your layout:
+
+```tsx
+// app/layout.tsx
+import PostHogInit from '@/components/PostHogInit'
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <PostHogInit />
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+Then use the server-side variant function in your page:
+
+```tsx
+import { getServerSideABVariant } from 'payload-ab/server'
 import { cookies } from 'next/headers'
+import { RichText } from '@payloadcms/richtext-lexical/react'
+
+// Define proper types for your document with A/B testing fields
+type DocumentWithAB = YourDocumentType & {
+  enableABTesting?: boolean
+  abVariant?: Partial<YourDocumentType>
+  posthogFeatureFlagKey?: string
+  [key: string]: unknown // Add index signature to satisfy Record<string, unknown> constraint
+}
 
 export default async function Page({ params }) {
   // Fetch your document from Payload
-  const document = await fetchDocument(params.id)
+  const document = (await fetchDocument(params.id)) as DocumentWithAB
+
+  // Get the cookie store
+  const cookieStore = await cookies() // await the cookieStore
 
   // Get the appropriate variant based on cookies
-  const content = await getServerSideABVariant(document, cookies())
+  const content = await getServerSideABVariant<DocumentWithAB, DocumentWithAB>(
+    document,
+    cookieStore,
+  )
 
   return (
     <div>
       <h1>{content.title}</h1>
-      <div>{content.content}</div>
+      <RichText data={content.content} />
     </div>
   )
+}
+```
+
+For development and testing, you can force a specific variant:
+
+```tsx
+// For development/testing only
+if (process.env.NODE_ENV === 'development' && document.enableABTesting && document.abVariant) {
+  // Force the variant to be shown
+  content = {
+    ...document,
+    ...document.abVariant,
+  }
 }
 ```
 
@@ -159,6 +236,16 @@ abTestingPlugin({
 })
 ```
 
+## Server-Side A/B Testing Features
+
+The server-side A/B testing functionality includes:
+
+- Automatic variant selection based on a consistent hashing algorithm
+- Support for PostHog cookies when available
+- Fallback to random test IDs when PostHog cookies aren't present (great for development)
+- 50/50 traffic split between original and variant content
+- Customizable feature flag keys
+
 ## Best Practices
 
 1. **Start Small**: Begin by testing one or two key fields rather than the entire document
@@ -171,14 +258,45 @@ abTestingPlugin({
 
 ### Common Issues
 
-**Issue**: The A/B variant fields are not appearing in my collection.
+**Issue**: The A/B variant fields are not appearing in my collection.  
 **Solution**: Ensure you've correctly specified the collection slug in the plugin configuration.
 
-**Issue**: Some fields are missing from the A/B variant.
+**Issue**: Some fields are missing from the A/B variant.  
 **Solution**: Check your `fields` or `excludeFields` configuration. System fields are excluded by default.
 
-**Issue**: Changes to the A/B variant are not reflecting on the frontend.
+**Issue**: Changes to the A/B variant are not reflecting on the frontend.  
 **Solution**: Ensure you're correctly merging the variant data with the default data in your frontend code.
+
+**Issue**: Getting error `PostHog was initialized without a token` in Next.js App Router.  
+**Solution**: Make sure you're initializing PostHog in a client component with a valid API key and that the environment variable is properly set.
+
+**Issue**: Error about `cookies()` should be awaited in Next.js App Router.  
+**Solution**: When using the `cookies()` function in Next.js, make sure to properly await it when passing to functions:
+
+```tsx
+const cookieStore = await cookies()
+const content = await getServerSideABVariant(document, cookieStore)
+```
+
+**Issue**: A/B testing variant not showing in server components.  
+**Solution**: The server-side variant selection relies on the PostHog cookie (`ph_distinct_id`). Make sure:
+
+1. PostHog is properly initialized on the client side
+2. The user has visited the site before so the cookie is set
+3. For testing, you can force a variant as shown in the examples above
+
+**Issue**: TypeScript error: `Type 'YourType' does not satisfy the constraint 'Record<string, unknown>'. Index signature for type 'string' is missing in type 'YourType'`.  
+**Solution**: Add an index signature to your document type:
+
+```tsx
+// Define a type that includes the A/B testing fields
+type DocumentWithAB = YourDocumentType & {
+  enableABTesting?: boolean
+  abVariant?: Partial<YourDocumentType>
+  posthogFeatureFlagKey?: string
+  [key: string]: unknown // Add this index signature
+}
+```
 
 ## Testing Your A/B Tests
 
@@ -197,13 +315,61 @@ posthog.featureFlags.override({
 
 ### Browser Testing
 
-1. Open your site in two different browsers or incognito windows
+1. Open your site in two different browsers or incognito windows (not just different tabs)
 2. You should see different variants in each window
 3. Use PostHog's debug mode to verify the feature flag is working:
 
 ```typescript
 posthog.debug(true)
 ```
+
+### Troubleshooting A/B Test Variants
+
+If you're not seeing different variants during testing:
+
+1. **Check PostHog initialization**: Make sure PostHog is properly initialized on the client side.
+
+2. **Verify cookies**: Add debug logging to check if the PostHog cookie is being set:
+
+   ```typescript
+   const cookieStore = cookies()
+   const phCookie = cookieStore.get('ph_distinct_id')
+   console.log('PostHog Cookie:', phCookie?.value)
+   ```
+
+3. **Test in private/incognito windows**: Regular browser refreshes may not change the variant. Use different browser sessions.
+
+4. **Force variants for testing**: For development, you can force variants:
+
+   ```typescript
+   // Force a specific variant
+   if (process.env.NODE_ENV === 'development') {
+     content = {
+       ...document,
+       ...document.abVariant,
+     }
+   } else {
+     content = await getServerSideABVariant(document, await cookieStore)
+   }
+   ```
+
+5. **Random assignment for testing**: Simulate different users getting different variants:
+
+   ```typescript
+   if (process.env.NODE_ENV === 'development') {
+     const randomValue = Math.random()
+     if (randomValue > 0.5) {
+       content = { ...document, ...document.abVariant }
+     } else {
+       content = document
+     }
+   }
+   ```
+
+6. **Check PostHog dashboard**: Verify in the PostHog dashboard that your feature flag is:
+   - Properly configured with the correct key
+   - Enabled for your project
+   - Set to distribute traffic between variants (e.g., 50/50 split)
 
 ### Debugging Tips
 
