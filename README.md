@@ -246,81 +246,38 @@ The server-side A/B testing functionality includes:
 - 50/50 traffic split between original and variant content
 - Customizable feature flag keys
 
-## Best Practices
-
-1. **Start Small**: Begin by testing one or two key fields rather than the entire document
-2. **Monitor Results**: Regularly check your PostHog dashboard to see which variant performs better
-3. **Iterate**: Use the insights gained to refine your content strategy
-
 ## Client-Side Tracking
 
-While server-side A/B testing works without any client-side code, you'll need to add minimal client-side tracking to see analytics data in your PostHog dashboard.
+The plugin provides a client-side component for tracking A/B test variants with PostHog.
 
-### Installation
+### TrackAB Component
 
-First, install the PostHog JavaScript SDK and React integration in your Next.js project:
-
-```bash
-npm install posthog-js
-# or
-yarn add posthog-js
-# or
-pnpm add posthog-js
-```
-
-And set your PostHog API key in your environment variables:
-
-```
-NEXT_PUBLIC_POSTHOG_KEY=your_posthog_api_key
-```
-
-### Using the TrackAB Component
-
-The plugin includes a ready-to-use `TrackAB` component that you can import directly:
+The `TrackAB` component allows you to track when a user is exposed to a specific variant of your A/B test. This is useful for tracking conversions and other metrics in PostHog.
 
 ```tsx
-// app/[id]/page.tsx
-import { getServerSideABVariant } from 'payload-ab/server'
 import { TrackAB } from 'payload-ab/client'
-import { cookies } from 'next/headers'
 
-// In your page component
-const post = res.docs[0] // Your document with A/B testing
-const cookieStore = cookies()
-
-// Get the feature flag key
-const featureFlagKey = post.posthogFeatureFlagKey || `ab_test_${String(post.id)}`
-
-// Use the server-side function to determine which variant to show
-const content = await getServerSideABVariant(post, await cookieStore)
-
-// Determine which variant was shown
-const isVariant = content !== post && post.enableABTesting
-const variantName = isVariant ? 'variant' : 'control'
-
-return (
-  <section>
-    {/* Add this component to track analytics */}
-    {post.enableABTesting && (
+export default function MyPage() {
+  return (
+    <>
+      {/* Track that the user saw variant "red-button" for flag "homepage-cta" */}
       <TrackAB 
-        flagKey={featureFlagKey}
-        variant={variantName}
-        // Optional: provide a distinct ID if you have one
-        // distinctId={userId}
+        flagKey="homepage-cta" 
+        variant="red-button" 
       />
-    )}
-    
-    <h1>{content.title}</h1>
-    {/* Rest of your content */}
-  </section>
-)
+      
+      {/* Your page content */}
+      <h1>Welcome to my page</h1>
+    </>
+  )
+}
 ```
 
-The `TrackAB` component accepts the following props:
+#### Props
 
-- `flagKey` (required): The feature flag key used for the A/B test
-- `variant` (required): The variant name that was shown ('control' or 'variant')
-- `distinctId` (optional): A custom distinct ID for PostHog tracking (if you have one)
+- `flagKey` (required): The PostHog feature flag key to track
+- `variant` (required): The variant name the user is seeing
+- `distinctId` (optional): A custom distinct ID to use for tracking. If not provided, PostHog will use its default ID
 
 ### Setting Up PostHog in Your App
 
@@ -332,6 +289,7 @@ To use the `TrackAB` component, you need to set up PostHog in your Next.js app:
 
 import { PropsWithChildren } from 'react'
 import posthog from 'posthog-js'
+import { PostHogProvider } from 'posthog-js/react'
 
 export function Providers({ children }: PropsWithChildren) {
   // Only initialize on the client side
@@ -346,7 +304,7 @@ export function Providers({ children }: PropsWithChildren) {
     }
   }
 
-  return <>{children}</>
+  return <PostHogProvider client={posthog}>{children}</PostHogProvider>
 }
 ```
 
@@ -367,7 +325,37 @@ export default function RootLayout({ children }) {
 }
 ```
 
-The `TrackAB` component doesn't require a PostHog provider as it uses dynamic imports, but it's still recommended to initialize PostHog in your app for consistent tracking.
+### Installation
+
+First, install the PostHog JavaScript SDK and React integration in your Next.js project:
+
+```bash
+npm install posthog-js
+# or
+yarn add posthog-js
+# or
+pnpm add posthog-js
+```
+
+And set your PostHog API key in your environment variables:
+
+```
+NEXT_PUBLIC_POSTHOG_KEY=your_posthog_api_key
+```
+
+### How It Works
+
+1. The `TrackAB` component uses the PostHog React hook to access the PostHog client
+2. It evaluates the feature flag and captures the `$feature_flag_called` event with the variant information
+3. This ensures accurate tracking of feature flag exposures in your PostHog analytics
+
+This approach ensures that your A/B test variants are properly tracked in PostHog, allowing you to analyze the performance of different variants.
+
+## Best Practices
+
+1. **Start Small**: Begin by testing one or two key fields rather than the entire document
+2. **Monitor Results**: Regularly check your PostHog dashboard to see which variant performs better
+3. **Iterate**: Use the insights gained to refine your content strategy
 
 ## Troubleshooting
 

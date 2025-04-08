@@ -7,78 +7,7 @@
  * @returns The content to display (either the variant or the original)
  */
 
-import { useEffect } from 'react'
-
-type ABTrackingProps = {
-  distinctId?: string // Optional — PostHog will assign one if not set
-  flagKey: string
-  variant: string
-}
-
-// Minimal PostHog type definition for our needs
-type PostHogType = {
-  __loaded?: boolean
-  capture: (eventName: string, properties: Record<string, unknown>) => void
-  getFeatureFlag: (key: string) => boolean | null | string
-  identify: (distinctId: string) => void
-  isFeatureEnabled: (key: string) => boolean
-}
-
-/**
- * Client-side component that tracks A/B test variant exposure
- * This ensures the variant is properly tracked in PostHog analytics
- */
-export function TrackAB({ distinctId, flagKey, variant }: ABTrackingProps) {
-  useEffect(() => {
-    // Only run on client side
-    if (typeof window === 'undefined') {
-      return
-    }
-
-    // Dynamically import PostHog to avoid SSR issues
-    const loadPostHog = async () => {
-      try {
-        // Dynamic import of PostHog
-        const PostHogModule = await import('posthog-js')
-        const posthog = PostHogModule.default as PostHogType
-
-        if (!posthog.__loaded) {
-          return
-        }
-
-        // If a distinct ID was provided, identify the user
-        if (distinctId) {
-          posthog.identify(distinctId)
-        }
-
-        // Check if the feature flag is enabled
-        // This will automatically capture the $feature_flag_called event
-        const isEnabled = posthog.isFeatureEnabled(flagKey)
-
-        // If the feature flag doesn't match our expected variant,
-        // we can capture an additional event for more detailed analytics
-        if (isEnabled && variant !== 'true') {
-          posthog.capture('ab_variant_exposure', {
-            distinct_id: distinctId,
-            flag_key: flagKey,
-            variant,
-          })
-        }
-      } catch (error) {
-        // Only log in development
-        if (process.env.NODE_ENV === 'development') {
-          // eslint-disable-next-line no-console
-          console.error('PostHog Feature Flag Error:', error)
-        }
-      }
-    }
-
-    // Execute the async function
-    void loadPostHog()
-  }, [distinctId, flagKey, variant])
-
-  return null
-}
+export { TrackAB } from '../components/TrackAB.js'
 
 export const getABTestVariant = <
   D extends {
