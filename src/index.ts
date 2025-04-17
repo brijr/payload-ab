@@ -173,31 +173,10 @@ export const abTestingPlugin =
 
         // Make sure all fields in the variant are nullable in the database
         const variantFields = contentFields.map((field: Field) => {
-          // Create a copy of the field
-          const fieldCopy = { ...field }
-
-          // For fields that can have a required property, make sure it's false
-          if ('name' in fieldCopy && 'type' in fieldCopy) {
-            // Only modify fields that can have a required property
-            const fieldTypes = [
-              'text',
-              'textarea',
-              'number',
-              'email',
-              'code',
-              'date',
-              'upload',
-              'relationship',
-              'select',
-            ]
-
-            if (fieldTypes.includes(fieldCopy.type as string)) {
-              // Type assertion to FieldWithRequired since we've verified it's a field type that can have required
-              ;(fieldCopy as FieldWithRequired).required = false
-            }
-          }
-
-          return fieldCopy
+          // Clone original field and remove "required" constraint for variants
+          const fieldCopy = { ...field } as FieldWithRequired;
+          fieldCopy.required = false;
+          return fieldCopy;
         })
 
         // Store field names for this collection to use in hooks
