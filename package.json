@@ -1,6 +1,6 @@
 {
   "name": "payload-ab",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "description": "Payload CMS plugin for A/B testing with PostHog",
   "license": "MIT",
   "type": "module",
@@ -54,6 +54,7 @@
     "test": "jest"
   },
   "devDependencies": {
+    "dotenv": "^16.0.0",
     "@eslint/eslintrc": "^3.2.0",
     "@payloadcms/db-mongodb": "3.29.0",
     "@payloadcms/db-postgres": "3.29.0",

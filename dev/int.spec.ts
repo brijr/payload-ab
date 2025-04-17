@@ -7,7 +7,6 @@
 
 import type { Payload } from 'payload'
 
-import dotenv from 'dotenv'
 import { MongoMemoryReplSet } from 'mongodb-memory-server'
 import path from 'path'
 import { getPayload } from 'payload'
@@ -24,11 +23,9 @@ let memoryDB: MongoMemoryReplSet | undefined
 describe('Plugin tests', () => {
   beforeAll(async () => {
     process.env.DISABLE_PAYLOAD_HMR = 'true'
-    process.env.PAYLOAD_DROP_DATABASE = 'true'
+    // We rely on a fresh in-memory replica set; dropping database isn't needed
+    // process.env.PAYLOAD_DROP_DATABASE = 'true'
 
-    dotenv.config({
-      path: path.resolve(dirname, './.env'),
-    })
 
     if (!process.env.DATABASE_URI) {
       console.log('Starting memory database')
@@ -86,5 +83,43 @@ describe('Plugin tests', () => {
     const { docs } = await payload.find({ collection: 'plugin-collection' })
 
     expect(docs).toHaveLength(1)
+  })
+  
+  it('copies control fields into abVariant when enabling A/B testing', async () => {
+    // Create a new post with some fields
+    const createData = {
+      title: 'Test Title',
+      content: [
+        { type: 'p', children: [{ text: 'Test content' }] },
+      ],
+      excerpt: 'Test excerpt',
+      author: 'Tester',
+      publishedDate: '2023-01-01',
+    }
+    const post = await payload.create({
+      collection: 'posts',
+      data: createData,
+    })
+    // Initially, A/B testing should be disabled
+    expect(post.enableABTesting).toBe(false)
+    expect(post.abVariant).toBeUndefined()
+
+    // Enable A/B testing on the post
+    const updated = await payload.update({
+      collection: 'posts',
+      id: post.id,
+      data: { enableABTesting: true },
+    })
+    expect(updated.enableABTesting).toBe(true)
+    // The abVariant group should now exist
+    expect(updated.abVariant).toBeDefined()
+    // Verify each control field was copied into abVariant
+    const variant = updated.abVariant as Record<string, any>
+    expect(variant.title).toBe(createData.title)
+    expect(variant.excerpt).toBe(createData.excerpt)
+    expect(variant.author).toBe(createData.author)
+    expect(variant.publishedDate).toBe(createData.publishedDate)
+    // Deep compare content arrays
+    expect(variant.content).toEqual(createData.content)
   })
 })

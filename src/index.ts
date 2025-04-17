@@ -354,37 +354,37 @@ export const abTestingPlugin =
       // Add the hook for this specific collection
       const copyToVariantHook: BeforeChangeHook = (args: BeforeChangeHookArgs) => {
         try {
-          const { data, originalDoc } = args
+          const { data, originalDoc } = args;
 
           // Initialize abVariant if not already present
-          if (!data.abVariant) {
-            data.abVariant = {}
+          if (!data.abVariant || typeof data.abVariant !== 'object') {
+            data.abVariant = {};
           }
 
           // If A/B testing is disabled, clear the variant data and exit early
-          if (data.enableABTesting === false) {
-            data.abVariant = {}
-            return Promise.resolve(data)
+          if (!data.enableABTesting) {
+            data.abVariant = {};
+            return Promise.resolve(data);
           }
 
-          // On initial enable (creation or toggle from false), copy control fields into abVariant
-          if (data.enableABTesting === true && !originalDoc?.enableABTesting) {
-            const fieldsToCopy = collectionFieldMappings[collectionSlug] || []
-            fieldsToCopy.forEach((fieldName) => {
-              const sourceValue = data[fieldName] !== undefined
-                ? data[fieldName]
-                : originalDoc?.[fieldName]
-              if (sourceValue !== undefined) {
-                (data.abVariant as Record<string, unknown>)[fieldName] = sourceValue
-              }
-            })
-          }
+          // Always copy any missing control fields into abVariant
+          const fieldsToCopy = collectionFieldMappings[collectionSlug] || [];
+          // Copy missing control fields into abVariant
+          const variantGroup = data.abVariant as Record<string, unknown>;
+          fieldsToCopy.forEach((fieldName) => {
+            // Skip if variant already has a value for this field
+            if (variantGroup[fieldName] !== undefined) return;
+            // Determine source value: new data overrides originalDoc
+            const sourceValue = data[fieldName] !== undefined ? data[fieldName] : originalDoc?.[fieldName];
+            if (sourceValue !== undefined) {
+              variantGroup[fieldName] = sourceValue;
+            }
+          });
 
-          return Promise.resolve(data)
+          return Promise.resolve(data);
         } catch (error) {
-          // Log error but don't throw to prevent breaking the save operation
-          console.error(`[A/B Plugin] Error in copyToVariantHook for ${collectionSlug}:`, error)
-          return Promise.resolve(args.data)
+          console.error(`[A/B Plugin] Error in copyToVariantHook for ${collectionSlug}:`, error);
+          return Promise.resolve(args.data);
         }
       }
 

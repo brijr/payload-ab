@@ -13,9 +13,14 @@ export const seed = async (payload: Payload) => {
   })
 
   if (!totalDocs) {
-    await payload.create({
-      collection: 'users',
-      data: devUser,
-    })
+    try {
+      await payload.create({
+        collection: 'users',
+        data: devUser,
+      })
+    } catch (err) {
+      // Ignore write conflicts or duplicate errors during seeding
+      console.warn('[Seed] could not create user, continuing:', err)
+    }
   }
 }

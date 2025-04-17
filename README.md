@@ -11,6 +11,7 @@ A powerful plugin for Payload CMS 3.x that adds A/B testing capabilities to your
 - 📊 Designed to work seamlessly with PostHog for analytics tracking
 - 📝 TypeScript support with full type definitions
 - 🎨 Clean UI with dedicated A/B testing tab in the admin panel
++ 🔁 Automatically pre-fills new variant fields with existing content when A/B testing is first enabled on a document
 
 ## Installation
 
