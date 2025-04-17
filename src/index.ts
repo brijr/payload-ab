@@ -354,16 +354,30 @@ export const abTestingPlugin =
       // Add the hook for this specific collection
       const copyToVariantHook: BeforeChangeHook = (args: BeforeChangeHookArgs) => {
         try {
-          const { data } = args
+          const { data, originalDoc } = args
 
           // Initialize abVariant if not already present
           if (!data.abVariant) {
             data.abVariant = {}
           }
 
-          // If A/B testing is disabled, clear the variant data
+          // If A/B testing is disabled, clear the variant data and exit early
           if (data.enableABTesting === false) {
             data.abVariant = {}
+            return Promise.resolve(data)
+          }
+
+          // On initial enable (creation or toggle from false), copy control fields into abVariant
+          if (data.enableABTesting === true && !originalDoc?.enableABTesting) {
+            const fieldsToCopy = collectionFieldMappings[collectionSlug] || []
+            fieldsToCopy.forEach((fieldName) => {
+              const sourceValue = data[fieldName] !== undefined
+                ? data[fieldName]
+                : originalDoc?.[fieldName]
+              if (sourceValue !== undefined) {
+                (data.abVariant as Record<string, unknown>)[fieldName] = sourceValue
+              }
+            })
           }
 
           return Promise.resolve(data)
