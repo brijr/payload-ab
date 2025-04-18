@@ -176,6 +176,54 @@ export const abTestingPlugin =
           // Clone original field and remove "required" constraint for variants
           const fieldCopy = { ...field } as FieldWithRequired
           fieldCopy.required = false
+
+          // For any field that might contain an ID, add a custom validation hook
+          if (fieldCopy.type === 'relationship' || fieldCopy.type === 'upload' || 
+              fieldCopy.type === 'array' || fieldCopy.type === 'blocks' || 
+              fieldCopy.type === 'richText') {
+            
+            // Add hooks to the field if they don't exist
+            if (!fieldCopy.hooks) {
+              fieldCopy.hooks = {}
+            }
+            
+            // Add beforeValidate hook to sanitize any potential ID fields
+            if (!fieldCopy.hooks.beforeValidate) {
+              fieldCopy.hooks.beforeValidate = []
+            }
+            
+            // Add a hook to sanitize potential ID fields
+            fieldCopy.hooks.beforeValidate.push(({ value }) => {
+              if (!value) return value
+              
+              // Function to recursively remove ID fields from objects
+              const sanitizeObject = (obj: any): any => {
+                if (!obj || typeof obj !== 'object') return obj
+                
+                // Handle arrays
+                if (Array.isArray(obj)) {
+                  return obj.map(sanitizeObject)
+                }
+                
+                // Handle objects
+                const sanitized = { ...obj }
+                delete sanitized.id
+                delete sanitized._id
+                
+                // Recursively sanitize all properties
+                Object.keys(sanitized).forEach(key => {
+                  if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
+                    sanitized[key] = sanitizeObject(sanitized[key])
+                  }
+                })
+                
+                return sanitized
+              }
+              
+              return sanitizeObject(value)
+            })
+          }
+          
           return fieldCopy
         })
 
@@ -275,14 +323,36 @@ export const abTestingPlugin =
                         // If the value is an object, ensure it doesn't have any system fields
                         if (value && typeof value === 'object') {
                           const sanitizedValue = { ...value } as Record<string, unknown>
-                          // Remove any system fields that might cause validation errors
-                          const systemFields = ['id', '_id', '__v', 'createdAt', 'updatedAt']
-                          systemFields.forEach((field) => {
-                            if (field in sanitizedValue) {
-                              delete sanitizedValue[field]
+                          
+                          // Function to recursively remove ID fields from objects
+                          const sanitizeObject = (obj: any): any => {
+                            if (!obj || typeof obj !== 'object') return obj
+                            
+                            // Handle arrays
+                            if (Array.isArray(obj)) {
+                              return obj.map(sanitizeObject)
                             }
-                          })
-                          return sanitizedValue
+                            
+                            // Handle objects
+                            const sanitized = { ...obj }
+                            delete sanitized.id
+                            delete sanitized._id
+                            delete sanitized.__v
+                            delete sanitized.createdAt
+                            delete sanitized.updatedAt
+                            
+                            // Recursively sanitize all properties
+                            Object.keys(sanitized).forEach(key => {
+                              if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
+                                sanitized[key] = sanitizeObject(sanitized[key])
+                              }
+                            })
+                            
+                            return sanitized
+                          }
+                          
+                          // Apply recursive sanitization
+                          return sanitizeObject(sanitizedValue)
                         }
                         return value
                       },
@@ -378,62 +448,48 @@ export const abTestingPlugin =
           // Create a new object for the variant instead of modifying the existing one
           // This ensures we start fresh and only include the fields we explicitly want
           const newVariant: Record<string, unknown> = {}
-
+          
           // Only copy the fields that are explicitly defined in the configuration
           fieldsToCopy.forEach((fieldName) => {
             // Determine source value: new data overrides originalDoc
             const sourceValue =
               data[fieldName] !== undefined ? data[fieldName] : originalDoc?.[fieldName]
-
+            
             if (sourceValue !== undefined) {
               console.log(
                 `[A/B Plugin] Copying field ${fieldName} to variant:`,
                 typeof sourceValue === 'object' ? 'Complex object' : sourceValue,
               )
-
-              // Handle special cases for complex objects
-              if (typeof sourceValue === 'object' && sourceValue !== null) {
-                try {
-                  // Use JSON parse/stringify for a deep clone
-                  // Make sure we don't include any system fields in nested objects
-                  const jsonString = JSON.stringify(sourceValue)
-                  const parsed = JSON.parse(jsonString)
-
-                  // If this is a document with an ID, remove it to prevent validation errors
-                  if (parsed && typeof parsed === 'object') {
-                    const parsedObj = parsed as Record<string, unknown>
-                    if ('id' in parsedObj) {
-                      delete parsedObj.id
-                    }
-                    if ('_id' in parsedObj) {
-                      delete parsedObj._id
-                    }
-                  }
-
-                  newVariant[fieldName] = parsed
-                } catch (_err) {
-                  // Fallback to shallow copy
-                  const shallowCopy = Array.isArray(sourceValue)
-                    ? [...sourceValue]
-                    : { ...sourceValue }
-
-                  // Remove system fields from shallow copy
-                  if (typeof shallowCopy === 'object') {
-                    const copyObj = shallowCopy as Record<string, unknown>
-                    if ('id' in copyObj) {
-                      delete copyObj.id
-                    }
-                    if ('_id' in copyObj) {
-                      delete copyObj._id
-                    }
-                  }
-
-                  newVariant[fieldName] = shallowCopy
+              
+              // Function to recursively sanitize objects
+              const sanitizeObject = (obj: any): any => {
+                if (!obj || typeof obj !== 'object') return obj
+                
+                // Handle arrays
+                if (Array.isArray(obj)) {
+                  return obj.map(sanitizeObject)
                 }
-              } else {
-                // For primitive values, assign directly
-                newVariant[fieldName] = sourceValue
+                
+                // Handle objects
+                const sanitized = { ...obj }
+                delete sanitized.id
+                delete sanitized._id
+                delete sanitized.__v
+                delete sanitized.createdAt
+                delete sanitized.updatedAt
+                
+                // Recursively sanitize all properties
+                Object.keys(sanitized).forEach(key => {
+                  if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
+                    sanitized[key] = sanitizeObject(sanitized[key])
+                  }
+                })
+                
+                return sanitized
               }
+              
+              // Apply sanitization before assigning
+              newVariant[fieldName] = sanitizeObject(sourceValue)
             }
           })
 
