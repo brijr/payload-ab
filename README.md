@@ -11,7 +11,7 @@ A powerful plugin for Payload CMS 3.x that adds A/B testing capabilities to your
 - 📊 Designed to work seamlessly with PostHog for analytics tracking
 - 📝 TypeScript support with full type definitions
 - 🎨 Clean UI with dedicated A/B testing tab in the admin panel
-+ 🔁 Automatically pre-fills new variant fields with existing content when A/B testing is first enabled on a document
+- 🔁 Automatically pre-fills new variant fields with existing content when A/B testing is first enabled on a document
 
 ## Installation
 
@@ -202,6 +202,58 @@ const MyComponent = ({ document }) => {
 6. Save the document
 
 ## Advanced Configuration
+
+### Field Selection
+
+You can control which fields are included in the A/B variant:
+
+```typescript
+import { buildConfig } from 'payload/config'
+import { abTestingPlugin } from 'payload-ab'
+
+export default buildConfig({
+  // ... your config
+  plugins: [
+    abTestingPlugin({
+      // Simple configuration with collection slugs
+      collections: ['simple-collection'],
+      
+      // OR advanced configuration with field selection
+      collections: {
+        'posts': {
+          // Only include these specific fields in the variant
+          fields: ['title', 'content', 'summary', 'image'],
+        },
+        'pages': {
+          // Exclude specific fields from the variant
+          excludeFields: ['id', 'createdAt', 'updatedAt', 'author'],
+        },
+        'products': {
+          // Disable A/B testing for this collection
+          enabled: false,
+        }
+      },
+      
+      // Optional PostHog configuration
+      posthog: {
+        apiKey: process.env.NEXT_PUBLIC_POSTHOG_KEY,
+        host: 'https://app.posthog.com',
+      },
+    }),
+  ],
+})
+```
+
+When A/B testing is enabled for a document, the plugin will automatically copy the content from the original fields to the variant fields. This ensures you start with identical content that you can then modify as needed.
+
+### Field Copying Behavior
+
+When you enable A/B testing on a document:
+
+1. The plugin creates a variant object with the same structure as your original content
+2. Only fields explicitly included in your configuration are copied to the variant
+3. System fields like `id`, `createdAt`, and `updatedAt` are never copied
+4. If you modify a field in the variant, that change persists even if you update the original field
 
 ### Plugin Options
 

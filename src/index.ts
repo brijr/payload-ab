@@ -351,82 +351,56 @@ export const abTestingPlugin =
             return Promise.resolve(data)
           }
 
-          // Always copy any missing control fields into abVariant
+          // Get the explicitly defined fields to copy from the collection config
           const fieldsToCopy = collectionFieldMappings[collectionSlug] || []
           console.log(`[A/B Plugin] fieldsToCopy for ${collectionSlug}:`, fieldsToCopy)
 
-          // Copy missing control fields into abVariant
-          const variantGroup = data.abVariant
+          // Create a new object for the variant instead of modifying the existing one
+          // This ensures we start fresh and only include the fields we explicitly want
+          const newVariant: Record<string, unknown> = {}
 
-          // First try the mapped fields approach
+          // Only copy the fields that are explicitly defined in the configuration
           fieldsToCopy.forEach((fieldName) => {
-            // Skip if variant already has a value for this field
-            if (variantGroup[fieldName] !== undefined) {
-              return
-            }
             // Determine source value: new data overrides originalDoc
-            const sourceValue =
-              data[fieldName] !== undefined ? data[fieldName] : originalDoc?.[fieldName]
+            const sourceValue = data[fieldName] !== undefined ? data[fieldName] : originalDoc?.[fieldName]
+
             if (sourceValue !== undefined) {
-              variantGroup[fieldName] = sourceValue
-            }
-          })
-
-          // Fallback: Dynamic approach to copy all fields if the mapping approach didn't work
-          // This ensures we copy everything even if field mappings are incorrect
-          const reservedFields = ['abVariant', 'enableABTesting', 'id', 'createdAt', 'updatedAt']
-          const allKeys = Array.from(
-            new Set([...Object.keys(data), ...Object.keys(originalDoc || {})]),
-          ).filter((key) => !reservedFields.includes(key))
-
-          console.log(`[A/B Plugin] All available keys for ${collectionSlug}:`, allKeys)
-          console.log(`[A/B Plugin] Current variant fields:`, Object.keys(variantGroup))
-
-          // Force copy ALL fields regardless of whether they're already in the variant
-          // This ensures we don't miss anything due to type issues or undefined checks
-          allKeys.forEach((key) => {
-            // Determine source value: new data overrides originalDoc
-            const sourceValue = data[key] !== undefined ? data[key] : originalDoc?.[key]
-            if (sourceValue !== undefined) {
-              // Log what we're copying to help debug
               console.log(
-                `[A/B Plugin] Copying field ${key} to variant:`,
+                `[A/B Plugin] Copying field ${fieldName} to variant:`,
                 typeof sourceValue === 'object' ? 'Complex object' : sourceValue,
               )
 
               // Handle special cases for complex objects
               if (typeof sourceValue === 'object' && sourceValue !== null) {
-                // For arrays and objects, create a deep copy to avoid reference issues
                 try {
-                  // Use JSON parse/stringify for a quick deep clone
-                  // This handles most cases but has limitations with circular references
-                  variantGroup[key] = JSON.parse(JSON.stringify(sourceValue))
+                  // Use JSON parse/stringify for a deep clone
+                  newVariant[fieldName] = JSON.parse(JSON.stringify(sourceValue))
                 } catch (_err) {
-                  // If JSON serialization fails, fall back to a shallow copy
-                  console.log(`[A/B Plugin] Deep copy failed for ${key}, using shallow copy`)
-                  variantGroup[key] = Array.isArray(sourceValue) 
-                    ? [...sourceValue] 
+                  // Fallback to shallow copy
+                  newVariant[fieldName] = Array.isArray(sourceValue)
+                    ? [...sourceValue]
                     : { ...sourceValue }
                 }
               } else {
                 // For primitive values, assign directly
-                variantGroup[key] = sourceValue
+                newVariant[fieldName] = sourceValue
               }
             }
           })
 
-          // Log the final variant for debugging
-          console.log(`[A/B Plugin] Final variant fields:`, Object.keys(variantGroup))
+          // Preserve any PostHog-related fields
+          if (data.abVariant?.posthogVariantName) {
+            newVariant.posthogVariantName = data.abVariant.posthogVariantName
+          }
 
-          // Ensure we're not including any invalid fields that might cause validation errors
-          // This is a safety measure to prevent the "invalid field: id" error
-          const fieldsToRemove = ['id', '_id', '__v', 'createdAt', 'updatedAt', 'updatedBy', 'createdBy']
-          fieldsToRemove.forEach((field) => {
-            if (field in variantGroup) {
-              delete variantGroup[field]
-              console.log(`[A/B Plugin] Removed invalid field from variant: ${field}`)
-            }
-          })
+          if (data.abVariant?.posthogFeatureFlagKey) {
+            newVariant.posthogFeatureFlagKey = data.abVariant.posthogFeatureFlagKey
+          }
+
+          // Replace the entire abVariant object with our new clean one
+          data.abVariant = newVariant
+
+          console.log(`[A/B Plugin] Final variant fields:`, Object.keys(newVariant))
 
           return Promise.resolve(data)
         } catch (error) {
