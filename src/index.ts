@@ -268,6 +268,26 @@ export const abTestingPlugin =
                         : 'Enable A/B testing above to start configuring your variant') as unknown as DescriptionFunction,
                   },
                   fields: variantFields,
+                  hooks: {
+                    // Add a hook to sanitize the variant data before it's saved
+                    beforeValidate: [
+                      ({ value }) => {
+                        // If the value is an object, ensure it doesn't have any system fields
+                        if (value && typeof value === 'object') {
+                          const sanitizedValue = { ...value } as Record<string, unknown>
+                          // Remove any system fields that might cause validation errors
+                          const systemFields = ['id', '_id', '__v', 'createdAt', 'updatedAt']
+                          systemFields.forEach((field) => {
+                            if (field in sanitizedValue) {
+                              delete sanitizedValue[field]
+                            }
+                          })
+                          return sanitizedValue
+                        }
+                        return value
+                      },
+                    ],
+                  },
                   label: 'Variant Content',
                   localized: false,
                   nullable: true,
@@ -362,7 +382,8 @@ export const abTestingPlugin =
           // Only copy the fields that are explicitly defined in the configuration
           fieldsToCopy.forEach((fieldName) => {
             // Determine source value: new data overrides originalDoc
-            const sourceValue = data[fieldName] !== undefined ? data[fieldName] : originalDoc?.[fieldName]
+            const sourceValue =
+              data[fieldName] !== undefined ? data[fieldName] : originalDoc?.[fieldName]
 
             if (sourceValue !== undefined) {
               console.log(
@@ -374,12 +395,40 @@ export const abTestingPlugin =
               if (typeof sourceValue === 'object' && sourceValue !== null) {
                 try {
                   // Use JSON parse/stringify for a deep clone
-                  newVariant[fieldName] = JSON.parse(JSON.stringify(sourceValue))
+                  // Make sure we don't include any system fields in nested objects
+                  const jsonString = JSON.stringify(sourceValue)
+                  const parsed = JSON.parse(jsonString)
+
+                  // If this is a document with an ID, remove it to prevent validation errors
+                  if (parsed && typeof parsed === 'object') {
+                    const parsedObj = parsed as Record<string, unknown>
+                    if ('id' in parsedObj) {
+                      delete parsedObj.id
+                    }
+                    if ('_id' in parsedObj) {
+                      delete parsedObj._id
+                    }
+                  }
+
+                  newVariant[fieldName] = parsed
                 } catch (_err) {
                   // Fallback to shallow copy
-                  newVariant[fieldName] = Array.isArray(sourceValue)
+                  const shallowCopy = Array.isArray(sourceValue)
                     ? [...sourceValue]
                     : { ...sourceValue }
+
+                  // Remove system fields from shallow copy
+                  if (typeof shallowCopy === 'object') {
+                    const copyObj = shallowCopy as Record<string, unknown>
+                    if ('id' in copyObj) {
+                      delete copyObj.id
+                    }
+                    if ('_id' in copyObj) {
+                      delete copyObj._id
+                    }
+                  }
+
+                  newVariant[fieldName] = shallowCopy
                 }
               } else {
                 // For primitive values, assign directly
