@@ -174,9 +174,9 @@ export const abTestingPlugin =
         // Make sure all fields in the variant are nullable in the database
         const variantFields = contentFields.map((field: Field) => {
           // Clone original field and remove "required" constraint for variants
-          const fieldCopy = { ...field } as FieldWithRequired;
-          fieldCopy.required = false;
-          return fieldCopy;
+          const fieldCopy = { ...field } as FieldWithRequired
+          fieldCopy.required = false
+          return fieldCopy
         })
 
         // Store field names for this collection to use in hooks
@@ -333,37 +333,71 @@ export const abTestingPlugin =
       // Add the hook for this specific collection
       const copyToVariantHook: BeforeChangeHook = (args: BeforeChangeHookArgs) => {
         try {
-          const { data, originalDoc } = args;
+          console.log(`[A/B Plugin] copyToVariantHook fired for ${collectionSlug}`, {
+            enableABTesting: args.data.enableABTesting,
+            hasOriginalDoc: !!args.originalDoc,
+          })
+
+          const { data, originalDoc } = args
 
           // Initialize abVariant if not already present
           if (!data.abVariant || typeof data.abVariant !== 'object') {
-            data.abVariant = {};
+            data.abVariant = {}
           }
 
           // If A/B testing is disabled, clear the variant data and exit early
           if (!data.enableABTesting) {
-            data.abVariant = {};
-            return Promise.resolve(data);
+            data.abVariant = {}
+            return Promise.resolve(data)
           }
 
           // Always copy any missing control fields into abVariant
-          const fieldsToCopy = collectionFieldMappings[collectionSlug] || [];
+          const fieldsToCopy = collectionFieldMappings[collectionSlug] || []
+          console.log(`[A/B Plugin] fieldsToCopy for ${collectionSlug}:`, fieldsToCopy)
+
           // Copy missing control fields into abVariant
-          const variantGroup = data.abVariant as Record<string, unknown>;
+          const variantGroup = data.abVariant
+
+          // First try the mapped fields approach
           fieldsToCopy.forEach((fieldName) => {
             // Skip if variant already has a value for this field
-            if (variantGroup[fieldName] !== undefined) return;
-            // Determine source value: new data overrides originalDoc
-            const sourceValue = data[fieldName] !== undefined ? data[fieldName] : originalDoc?.[fieldName];
-            if (sourceValue !== undefined) {
-              variantGroup[fieldName] = sourceValue;
+            if (variantGroup[fieldName] !== undefined) {
+              return
             }
-          });
+            // Determine source value: new data overrides originalDoc
+            const sourceValue =
+              data[fieldName] !== undefined ? data[fieldName] : originalDoc?.[fieldName]
+            if (sourceValue !== undefined) {
+              variantGroup[fieldName] = sourceValue
+            }
+          })
 
-          return Promise.resolve(data);
+          // Fallback: Dynamic approach to copy all fields if the mapping approach didn't work
+          // This ensures we copy everything even if field mappings are incorrect
+          const reservedFields = ['abVariant', 'enableABTesting', 'id', 'createdAt', 'updatedAt']
+          const allKeys = Array.from(
+            new Set([...Object.keys(data), ...Object.keys(originalDoc || {})]),
+          ).filter((key) => !reservedFields.includes(key))
+
+          console.log(`[A/B Plugin] All available keys for ${collectionSlug}:`, allKeys)
+
+          allKeys.forEach((key) => {
+            // Skip if variant already has a value for this field or it's a reserved field
+            if (variantGroup[key] !== undefined) {
+              return
+            }
+
+            // Determine source value: new data overrides originalDoc
+            const sourceValue = data[key] !== undefined ? data[key] : originalDoc?.[key]
+            if (sourceValue !== undefined) {
+              variantGroup[key] = sourceValue
+            }
+          })
+
+          return Promise.resolve(data)
         } catch (error) {
-          console.error(`[A/B Plugin] Error in copyToVariantHook for ${collectionSlug}:`, error);
-          return Promise.resolve(args.data);
+          console.error(`[A/B Plugin] Error in copyToVariantHook for ${collectionSlug}:`, error)
+          return Promise.resolve(args.data)
         }
       }
 
