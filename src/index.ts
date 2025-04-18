@@ -380,19 +380,27 @@ export const abTestingPlugin =
           ).filter((key) => !reservedFields.includes(key))
 
           console.log(`[A/B Plugin] All available keys for ${collectionSlug}:`, allKeys)
+          console.log(`[A/B Plugin] Current variant fields:`, Object.keys(variantGroup))
 
+          // Force copy ALL fields regardless of whether they're already in the variant
+          // This ensures we don't miss anything due to type issues or undefined checks
           allKeys.forEach((key) => {
-            // Skip if variant already has a value for this field or it's a reserved field
-            if (variantGroup[key] !== undefined) {
-              return
-            }
-
             // Determine source value: new data overrides originalDoc
             const sourceValue = data[key] !== undefined ? data[key] : originalDoc?.[key]
             if (sourceValue !== undefined) {
+              // Log what we're copying to help debug
+              console.log(
+                `[A/B Plugin] Copying field ${key} to variant:`,
+                typeof sourceValue === 'object' ? 'Complex object' : sourceValue,
+              )
+
+              // Force assign the value
               variantGroup[key] = sourceValue
             }
           })
+
+          // Log the final variant for debugging
+          console.log(`[A/B Plugin] Final variant fields:`, Object.keys(variantGroup))
 
           return Promise.resolve(data)
         } catch (error) {
