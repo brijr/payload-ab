@@ -394,13 +394,39 @@ export const abTestingPlugin =
                 typeof sourceValue === 'object' ? 'Complex object' : sourceValue,
               )
 
-              // Force assign the value
-              variantGroup[key] = sourceValue
+              // Handle special cases for complex objects
+              if (typeof sourceValue === 'object' && sourceValue !== null) {
+                // For arrays and objects, create a deep copy to avoid reference issues
+                try {
+                  // Use JSON parse/stringify for a quick deep clone
+                  // This handles most cases but has limitations with circular references
+                  variantGroup[key] = JSON.parse(JSON.stringify(sourceValue))
+                } catch (_err) {
+                  // If JSON serialization fails, fall back to a shallow copy
+                  console.log(`[A/B Plugin] Deep copy failed for ${key}, using shallow copy`)
+                  variantGroup[key] = Array.isArray(sourceValue) 
+                    ? [...sourceValue] 
+                    : { ...sourceValue }
+                }
+              } else {
+                // For primitive values, assign directly
+                variantGroup[key] = sourceValue
+              }
             }
           })
 
           // Log the final variant for debugging
           console.log(`[A/B Plugin] Final variant fields:`, Object.keys(variantGroup))
+
+          // Ensure we're not including any invalid fields that might cause validation errors
+          // This is a safety measure to prevent the "invalid field: id" error
+          const fieldsToRemove = ['id', '_id', '__v', 'createdAt', 'updatedAt', 'updatedBy', 'createdBy']
+          fieldsToRemove.forEach((field) => {
+            if (field in variantGroup) {
+              delete variantGroup[field]
+              console.log(`[A/B Plugin] Removed invalid field from variant: ${field}`)
+            }
+          })
 
           return Promise.resolve(data)
         } catch (error) {
