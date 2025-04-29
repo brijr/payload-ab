@@ -77,26 +77,24 @@ First, set up PostHog initialization in a client component:
 // components/PostHogInit.tsx
 'use client'
 
-import { useEffect } from 'react'
 import posthog from 'posthog-js'
+import { PostHogProvider as PHProvider } from 'posthog-js/react'
 
-export default function PostHogInit() {
-  useEffect(() => {
-    // Initialize PostHog only on the client side
-    if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
-      posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-        api_host: 'https://app.posthog.com',
-        capture_pageview: true,
-        loaded: (posthog) => {
-          if (process.env.NODE_ENV === 'development') {
-            posthog.debug()
-          }
-        },
-      })
-    }
-  }, [])
+const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY!
+const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com'
 
-  return null
+// Initialize IMMEDIATELY (not inside useEffect)
+if (typeof window !== 'undefined' && !posthog.__loaded) {
+  posthog.init(posthogKey, {
+    api_host: posthogHost,
+    loaded: (ph) => {
+      console.log('✅ PostHog initialized')
+    },
+  })
+}
+
+export function PostHogProvider({ children }: { children: React.ReactNode }) {
+  return <PHProvider client={posthog}>{children}</PHProvider>
 }
 ```
 
