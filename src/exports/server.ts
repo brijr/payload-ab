@@ -6,6 +6,8 @@
  * @param cookies The cookies object from Next.js (from cookies() function)
  * @returns The content to display (either the variant or the original)
  */
+import merge from 'lodash.merge'
+
 export const getServerSideABVariant = async <
   D extends {
     abVariant?: Record<string, unknown>
@@ -52,11 +54,10 @@ export const getServerSideABVariant = async <
     const showVariant = Math.abs(hash) % 2 === 0
 
     if (showVariant) {
-      // Return merged document with variant content
-      return {
-        ...document,
-        ...document.abVariant,
-      }
+      console.log(`[A/B Plugin] Serving variant for user ${distinctId} on flag ${featureFlagKey}`)
+      return merge({}, document, document.abVariant)
+    } else {
+      console.log(`[A/B Plugin] Serving control for user ${distinctId} on flag ${featureFlagKey}`)
     }
   } catch (_error) {
     // In case of error, return the original document
