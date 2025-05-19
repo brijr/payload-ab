@@ -54,7 +54,6 @@
     "test": "jest"
   },
   "devDependencies": {
-    "dotenv": "^16.0.0",
     "@eslint/eslintrc": "^3.2.0",
     "@payloadcms/db-mongodb": "3.29.0",
     "@payloadcms/db-postgres": "3.29.0",
@@ -67,11 +66,13 @@
     "@swc/cli": "0.6.0",
     "@swc/jest": "^0.2.37",
     "@types/jest": "29.5.12",
+    "@types/lodash.merge": "^4.6.9",
     "@types/node": "^22.5.4",
     "@types/react": "19.0.7",
     "@types/react-dom": "19.0.3",
     "copyfiles": "2.4.1",
     "cross-env": "^7.0.3",
+    "dotenv": "^16.0.0",
     "eslint": "^9.23.0",
     "eslint-config-next": "15.2.3",
     "graphql": "^16.8.1",
@@ -101,5 +102,8 @@
       "sharp"
     ]
   },
-  "registry": "https://registry.npmjs.org/"
+  "registry": "https://registry.npmjs.org/",
+  "dependencies": {
+    "lodash.merge": "^4.6.2"
+  }
 }

@@ -439,109 +439,6 @@ export const abTestingPlugin =
 
           const { data, originalDoc } = args
 
-          // Initialize abVariant if not already present
-          if (!data.abVariant || typeof data.abVariant !== 'object') {
-            data.abVariant = {}
-          }
-
-          // If A/B testing is disabled, clear the variant data and exit early
-          if (!data.enableABTesting) {
-            data.abVariant = {}
-            return Promise.resolve(data)
-          }
-
-          // Get the explicitly defined fields to copy from the collection config
-          const fieldsToCopy = collectionFieldMappings[collectionSlug] || []
-          console.log(`[A/B Plugin] fieldsToCopy for ${collectionSlug}:`, fieldsToCopy)
-
-          // Create a new object for the variant instead of modifying the existing one
-          // This ensures we start fresh and only include the fields we explicitly want
-          const newVariant: Record<string, unknown> = {}
-
-          // Only copy the fields that are explicitly defined in the configuration
-          fieldsToCopy.forEach((fieldName) => {
-            // Determine source value: new data overrides originalDoc
-            const sourceValue =
-              data[fieldName] !== undefined ? data[fieldName] : originalDoc?.[fieldName]
-
-            if (sourceValue !== undefined) {
-              console.log(
-                `[A/B Plugin] Copying field ${fieldName} to variant:`,
-                typeof sourceValue === 'object' ? 'Complex object' : sourceValue,
-              )
-
-              // Special handling for blocks and complex fields
-              if (
-                fieldName === 'content' ||
-                fieldName === 'callOut' ||
-                fieldName === 'callToAction' ||
-                fieldName === 'subTitle' ||
-                typeof sourceValue === 'object'
-              ) {
-                console.log(`[A/B Plugin] Special handling for complex field: ${fieldName}`)
-
-                try {
-                  // For blocks and complex objects, use a more careful approach
-                  // First stringify to break references
-                  const jsonString = JSON.stringify(sourceValue)
-                  let parsed
-
-                  try {
-                    parsed = JSON.parse(jsonString)
-                  } catch (err) {
-                    console.log(`[A/B Plugin] Error parsing JSON for ${fieldName}:`, err)
-                    parsed = sourceValue // Fallback to original
-                  }
-
-                  // If we have blocks, ensure we handle them properly
-                  if (
-                    Array.isArray(parsed) &&
-                    parsed.length > 0 &&
-                    parsed[0] &&
-                    (parsed[0].blockType || parsed[0].type || parsed[0].blockName)
-                  ) {
-                    console.log(`[A/B Plugin] Detected blocks in ${fieldName}, sanitizing...`)
-
-                    // Process each block to remove problematic fields
-                    const sanitizedBlocks = parsed.map((block) => {
-                      // Create a clean block without IDs
-                      const cleanBlock = { ...block }
-                      delete cleanBlock.id
-                      delete cleanBlock._id
-
-                      // Keep the block type and content
-                      return {
-                        blockType: block.blockType || block.type || block.blockName,
-                        // Preserve all other content fields
-                        ...Object.entries(cleanBlock)
-                          .filter(
-                            ([key]) =>
-                              !['__v', '_id', 'createdAt', 'id', 'updatedAt'].includes(key),
-                          )
-                          .reduce((obj, [key, val]) => ({ ...obj, [key]: val }), {}),
-                      }
-                    })
-
-                    newVariant[fieldName] = sanitizedBlocks
-                  } else {
-                    // For other complex objects, use the recursive sanitizer
-                    newVariant[fieldName] = sanitizeObject(parsed)
-                  }
-                } catch (err) {
-                  console.log(`[A/B Plugin] Error processing ${fieldName}:`, err)
-                  // Last resort: try a shallow copy
-                  const shallowCopy = Array.isArray(sourceValue)
-                    ? [...sourceValue]
-                    : { ...sourceValue }
-                  newVariant[fieldName] = sanitizeObject(shallowCopy)
-                }
-              } else {
-                // For primitive values, assign directly
-                newVariant[fieldName] = sourceValue
-              }
-            }
-          })
-
           // Function to recursively sanitize objects
           const sanitizeObject = (obj: any): any => {
             if (!obj || typeof obj !== 'object') {
@@ -571,19 +468,137 @@ export const abTestingPlugin =
             return sanitized
           }
 
-          // Preserve any PostHog-related fields
-          if (data.abVariant?.posthogVariantName) {
-            newVariant.posthogVariantName = data.abVariant.posthogVariantName
+          // Initialize abVariant if not already present
+          if (!data.abVariant || typeof data.abVariant !== 'object') {
+            data.abVariant = {}
           }
 
-          if (data.abVariant?.posthogFeatureFlagKey) {
-            newVariant.posthogFeatureFlagKey = data.abVariant.posthogFeatureFlagKey
+          // If A/B testing is disabled, clear the variant data and exit early
+          if (!data.enableABTesting) {
+            data.abVariant = {}
+            return Promise.resolve(data)
           }
 
-          // Replace the entire abVariant object with our new clean one
-          data.abVariant = newVariant
+          // Check if this is the first time A/B testing is being enabled
+          const wasABTestingEnabled = originalDoc?.enableABTesting === true
+          const isABTestingEnabled = data.enableABTesting === true
+          const isFirstTimeEnabling = isABTestingEnabled && !wasABTestingEnabled
 
-          console.log(`[A/B Plugin] Final variant fields:`, Object.keys(newVariant))
+          // Only copy content if this is the first time enabling A/B testing
+          if (isFirstTimeEnabling) {
+            console.log(
+              `[A/B Plugin] First time enabling A/B testing for ${collectionSlug}, copying content to variant`,
+            )
+
+            // Get the explicitly defined fields to copy from the collection config
+            const fieldsToCopy = collectionFieldMappings[collectionSlug] || []
+            console.log(`[A/B Plugin] fieldsToCopy for ${collectionSlug}:`, fieldsToCopy)
+
+            // Create a new object for the variant instead of modifying the existing one
+            const newVariant: Record<string, unknown> = {}
+
+            // Only copy the fields that are explicitly defined in the configuration
+            fieldsToCopy.forEach((fieldName) => {
+              // Determine source value: new data overrides originalDoc
+              const sourceValue =
+                data[fieldName] !== undefined ? data[fieldName] : originalDoc?.[fieldName]
+
+              if (sourceValue !== undefined) {
+                console.log(
+                  `[A/B Plugin] Copying field ${fieldName} to variant:`,
+                  typeof sourceValue === 'object' ? 'Complex object' : sourceValue,
+                )
+
+                // Special handling for blocks and complex fields
+                if (
+                  fieldName === 'content' ||
+                  fieldName === 'callOut' ||
+                  fieldName === 'callToAction' ||
+                  fieldName === 'subTitle' ||
+                  typeof sourceValue === 'object'
+                ) {
+                  console.log(`[A/B Plugin] Special handling for complex field: ${fieldName}`)
+
+                  try {
+                    // For blocks and complex objects, use a more careful approach
+                    // First stringify to break references
+                    const jsonString = JSON.stringify(sourceValue)
+                    let parsed
+
+                    try {
+                      parsed = JSON.parse(jsonString)
+                    } catch (err) {
+                      console.log(`[A/B Plugin] Error parsing JSON for ${fieldName}:`, err)
+                      parsed = sourceValue // Fallback to original
+                    }
+
+                    // If we have blocks, ensure we handle them properly
+                    if (
+                      Array.isArray(parsed) &&
+                      parsed.length > 0 &&
+                      parsed[0] &&
+                      (parsed[0].blockType || parsed[0].type || parsed[0].blockName)
+                    ) {
+                      console.log(`[A/B Plugin] Detected blocks in ${fieldName}, sanitizing...`)
+
+                      // Process each block to remove problematic fields
+                      const sanitizedBlocks = parsed.map((block) => {
+                        // Create a clean block without IDs
+                        const cleanBlock = { ...block }
+                        delete cleanBlock.id
+                        delete cleanBlock._id
+
+                        // Keep the block type and content
+                        return {
+                          blockType: block.blockType || block.type || block.blockName,
+                          // Preserve all other content fields
+                          ...Object.entries(cleanBlock)
+                            .filter(
+                              ([key]) =>
+                                !['__v', '_id', 'createdAt', 'id', 'updatedAt'].includes(key),
+                            )
+                            .reduce((obj, [key, val]) => ({ ...obj, [key]: val }), {}),
+                        }
+                      })
+
+                      newVariant[fieldName] = sanitizedBlocks
+                    } else {
+                      // For other complex objects, use the recursive sanitizer
+                      newVariant[fieldName] = sanitizeObject(parsed)
+                    }
+                  } catch (err) {
+                    console.log(`[A/B Plugin] Error processing ${fieldName}:`, err)
+                    // Last resort: try a shallow copy
+                    const shallowCopy = Array.isArray(sourceValue)
+                      ? [...sourceValue]
+                      : { ...sourceValue }
+                    newVariant[fieldName] = sanitizeObject(shallowCopy)
+                  }
+                } else {
+                  // For primitive values, assign directly
+                  newVariant[fieldName] = sourceValue
+                }
+              }
+            })
+
+            // Preserve any PostHog-related fields
+            if (data.abVariant?.posthogVariantName) {
+              newVariant.posthogVariantName = data.abVariant.posthogVariantName
+            }
+
+            if (data.abVariant?.posthogFeatureFlagKey) {
+              newVariant.posthogFeatureFlagKey = data.abVariant.posthogFeatureFlagKey
+            }
+
+            // Replace the entire abVariant object with our new clean one
+            data.abVariant = newVariant
+
+            console.log(`[A/B Plugin] Final variant fields:`, Object.keys(newVariant))
+          } else {
+            console.log(
+              `[A/B Plugin] A/B testing already enabled for ${collectionSlug}, preserving existing variant content`,
+            )
+          }
 
           return Promise.resolve(data)
         } catch (error) {
