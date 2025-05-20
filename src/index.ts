@@ -479,13 +479,15 @@ export const abTestingPlugin =
             return Promise.resolve(data)
           }
 
-          // Check if A/B testing is being enabled
+          // Check if this is the first time A/B testing is being enabled
+          const wasABTestingEnabled = originalDoc?.enableABTesting === true
           const isABTestingEnabled = data.enableABTesting === true
+          const isFirstTimeEnabling = isABTestingEnabled && !wasABTestingEnabled
 
-          // Copy content whenever A/B testing is enabled
-          if (isABTestingEnabled) {
+          // Only copy content if this is the first time enabling A/B testing
+          if (isFirstTimeEnabling) {
             console.log(
-              `[A/B Plugin] A/B testing enabled for ${collectionSlug}, copying content to variant`,
+              `[A/B Plugin] First time enabling A/B testing for ${collectionSlug}, copying content to variant`,
             )
 
             // Get the explicitly defined fields to copy from the collection config
@@ -509,7 +511,6 @@ export const abTestingPlugin =
 
                 // Special handling for blocks and complex fields
                 if (
-                  fieldName === 'blocks' ||
                   fieldName === 'content' ||
                   fieldName === 'callOut' ||
                   fieldName === 'callToAction' ||
@@ -546,27 +547,18 @@ export const abTestingPlugin =
                         const cleanBlock = { ...block }
                         delete cleanBlock.id
                         delete cleanBlock._id
-                        delete cleanBlock.__v
-                        delete cleanBlock.createdAt
-                        delete cleanBlock.updatedAt
 
                         // Keep the block type and content
-                        const sanitizedBlock: Record<string, any> = {
+                        return {
                           blockType: block.blockType || block.type || block.blockName,
+                          // Preserve all other content fields
+                          ...Object.entries(cleanBlock)
+                            .filter(
+                              ([key]) =>
+                                !['__v', '_id', 'createdAt', 'id', 'updatedAt'].includes(key),
+                            )
+                            .reduce((obj, [key, val]) => ({ ...obj, [key]: val }), {}),
                         }
-
-                        // Preserve all other content fields
-                        Object.entries(cleanBlock).forEach(([key, value]) => {
-                          if (!['__v', '_id', 'createdAt', 'id', 'updatedAt'].includes(key)) {
-                            if (typeof value === 'object' && value !== null) {
-                              sanitizedBlock[key] = sanitizeObject(value)
-                            } else {
-                              sanitizedBlock[key] = value
-                            }
-                          }
-                        })
-
-                        return sanitizedBlock
                       })
 
                       newVariant[fieldName] = sanitizedBlocks
@@ -604,7 +596,7 @@ export const abTestingPlugin =
             console.log(`[A/B Plugin] Final variant fields:`, Object.keys(newVariant))
           } else {
             console.log(
-              `[A/B Plugin] A/B testing disabled for ${collectionSlug}, clearing variant content`,
+              `[A/B Plugin] A/B testing already enabled for ${collectionSlug}, preserving existing variant content`,
             )
           }
 
