@@ -542,22 +542,30 @@ export const abTestingPlugin =
                       console.log(`[A/B Plugin] Detected blocks in ${fieldName}, sanitizing...`)
 
                       // Process each block to remove problematic fields
-                      const sanitizedBlocks = parsed.map((block) => {
-                        // Create a clean block without IDs
-                        const cleanBlock = { ...block }
-                        delete cleanBlock.id
-                        delete cleanBlock._id
+                      const sanitizedBlocks = parsed.map((block: any) => {
+                        // 1. Get the original block type.
+                        const type = block.blockType || block.type || block.blockName
 
-                        // Keep the block type and content
+                        // 2. Create a copy of the block's content to modify.
+                        //    We will pass this to sanitizeObject.
+                        const blockDataToSanitize = { ...block }
+
+                        // 3. Remove original top-level id, _id from this copy before full sanitization.
+                        //    Also remove the various type designators because we'll add the canonical `blockType` back.
+                        //    sanitizeObject (defined in the outer scope) will handle nested ids.
+                        delete blockDataToSanitize.id
+                        delete blockDataToSanitize._id
+                        delete blockDataToSanitize.blockType // remove if it exists from the data payload
+                        delete blockDataToSanitize.type // remove if it exists from the data payload
+                        delete blockDataToSanitize.blockName // remove if it exists from the data payload
+
+                        // 4. Recursively sanitize all remaining fields in the block data.
+                        const sanitizedInternalFields = sanitizeObject(blockDataToSanitize)
+
+                        // 5. Construct the new block with the correct blockType and sanitized fields.
                         return {
-                          blockType: block.blockType || block.type || block.blockName,
-                          // Preserve all other content fields
-                          ...Object.entries(cleanBlock)
-                            .filter(
-                              ([key]) =>
-                                !['__v', '_id', 'createdAt', 'id', 'updatedAt'].includes(key),
-                            )
-                            .reduce((obj, [key, val]) => ({ ...obj, [key]: val }), {}),
+                          blockType: type,
+                          ...sanitizedInternalFields,
                         }
                       })
 
