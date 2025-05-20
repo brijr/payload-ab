@@ -110,6 +110,36 @@ export const abTestingPlugin =
     // Create a copy of the incoming config with proper typing
     const config = { ...incomingConfig } as ConfigWithHooks
 
+    // --- Start: Define Shared Sanitize Object Function ---
+    const sanitizeObject = (obj: any): any => {
+      if (!obj || typeof obj !== 'object') {
+        return obj
+      }
+
+      // Handle arrays
+      if (Array.isArray(obj)) {
+        return obj.map(sanitizeObject)
+      }
+
+      // Handle objects
+      const sanitized = { ...obj }
+      delete sanitized.id
+      delete sanitized._id
+      delete sanitized.__v
+      delete sanitized.createdAt
+      delete sanitized.updatedAt
+
+      // Recursively sanitize all properties
+      Object.keys(sanitized).forEach((key) => {
+        if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
+          sanitized[key] = sanitizeObject(sanitized[key])
+        }
+      })
+
+      return sanitized
+    }
+    // --- End: Define Shared Sanitize Object Function ---
+
     // Ensure collections exist
     if (!config.collections) {
       config.collections = []
@@ -199,32 +229,6 @@ export const abTestingPlugin =
             fieldCopy.hooks.beforeValidate.push(({ value }) => {
               if (!value) {
                 return value
-              }
-
-              // Function to recursively remove ID fields from objects
-              const sanitizeObject = (obj: any): any => {
-                if (!obj || typeof obj !== 'object') {
-                  return obj
-                }
-
-                // Handle arrays
-                if (Array.isArray(obj)) {
-                  return obj.map(sanitizeObject)
-                }
-
-                // Handle objects
-                const sanitized = { ...obj }
-                delete sanitized.id
-                delete sanitized._id
-
-                // Recursively sanitize all properties
-                Object.keys(sanitized).forEach((key) => {
-                  if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
-                    sanitized[key] = sanitizeObject(sanitized[key])
-                  }
-                })
-
-                return sanitized
               }
 
               return sanitizeObject(value)
@@ -329,39 +333,8 @@ export const abTestingPlugin =
                       ({ value }) => {
                         // If the value is an object, ensure it doesn't have any system fields
                         if (value && typeof value === 'object') {
-                          const sanitizedValue = { ...value } as Record<string, unknown>
-
-                          // Function to recursively remove ID fields from objects
-                          const sanitizeObject = (obj: any): any => {
-                            if (!obj || typeof obj !== 'object') {
-                              return obj
-                            }
-
-                            // Handle arrays
-                            if (Array.isArray(obj)) {
-                              return obj.map(sanitizeObject)
-                            }
-
-                            // Handle objects
-                            const sanitized = { ...obj }
-                            delete sanitized.id
-                            delete sanitized._id
-                            delete sanitized.__v
-                            delete sanitized.createdAt
-                            delete sanitized.updatedAt
-
-                            // Recursively sanitize all properties
-                            Object.keys(sanitized).forEach((key) => {
-                              if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
-                                sanitized[key] = sanitizeObject(sanitized[key])
-                              }
-                            })
-
-                            return sanitized
-                          }
-
-                          // Apply recursive sanitization
-                          return sanitizeObject(sanitizedValue)
+                          const sanitizedValue = sanitizeObject(value)
+                          return sanitizedValue
                         }
                         return value
                       },
@@ -438,35 +411,6 @@ export const abTestingPlugin =
           })
 
           const { data, originalDoc } = args
-
-          // Function to recursively sanitize objects
-          const sanitizeObject = (obj: any): any => {
-            if (!obj || typeof obj !== 'object') {
-              return obj
-            }
-
-            // Handle arrays
-            if (Array.isArray(obj)) {
-              return obj.map(sanitizeObject)
-            }
-
-            // Handle objects
-            const sanitized = { ...obj }
-            delete sanitized.id
-            delete sanitized._id
-            delete sanitized.__v
-            delete sanitized.createdAt
-            delete sanitized.updatedAt
-
-            // Recursively sanitize all properties
-            Object.keys(sanitized).forEach((key) => {
-              if (typeof sanitized[key] === 'object' && sanitized[key] !== null) {
-                sanitized[key] = sanitizeObject(sanitized[key])
-              }
-            })
-
-            return sanitized
-          }
 
           // Initialize abVariant if not already present
           if (!data.abVariant || typeof data.abVariant !== 'object') {
