@@ -83,7 +83,6 @@ import { PostHogProvider as PHProvider } from 'posthog-js/react'
 const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY!
 const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com'
 
-// Initialize IMMEDIATELY (not inside useEffect)
 if (typeof window !== 'undefined' && !posthog.__loaded) {
   posthog.init(posthogKey, {
     api_host: posthogHost,
