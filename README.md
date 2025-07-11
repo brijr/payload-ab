@@ -16,10 +16,10 @@ A powerful plugin for Payload CMS 3.x that adds A/B testing capabilities to your
 ## Installation
 
 ```bash
+# Using pnpm (recommended)
+pnpm add payload-ab
 # Using npm
 npm install payload-ab
-# Using pnpm
-pnpm add payload-ab
 # Using yarn
 yarn add payload-ab
 ```
@@ -380,11 +380,12 @@ export default function RootLayout({ children }) {
 First, install the PostHog JavaScript SDK and React integration in your Next.js project:
 
 ```bash
-npm install posthog-js
-# or
-yarn add posthog-js
-# or
+# Using pnpm (recommended)
 pnpm add posthog-js
+# Using npm
+npm install posthog-js
+# Using yarn
+yarn add posthog-js
 ```
 
 And set your PostHog API key in your environment variables:
