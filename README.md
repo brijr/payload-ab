@@ -44,6 +44,105 @@ This plugin integrates with PostHog to provide analytics and feature flag functi
 
 For more information on setting up experiments in PostHog, see the [PostHog documentation](https://posthog.com/docs/experiments/installation).
 
+## Your First A/B Test in 5 Minutes
+
+Let's get you up and running with a basic A/B test in just a few minutes!
+
+### Step 1: Basic Plugin Setup
+
+Add the plugin to your Payload config with minimal configuration:
+
+```typescript
+import { buildConfig } from 'payload/config'
+import { abTestingPlugin } from 'payload-ab'
+
+export default buildConfig({
+  // ... your existing config
+  plugins: [
+    abTestingPlugin({
+      collections: ['posts'], // Enable A/B testing for posts
+    }),
+  ],
+})
+```
+
+### Step 2: Create Your First Test Document
+
+1. Start your Payload admin (`pnpm dev`)
+2. Go to Posts collection and create a new post
+3. Fill in the basic fields (title, content, etc.)
+4. Click on the **"📊 A/B Testing"** tab
+5. Toggle **"Enable A/B Testing"** to `true`
+6. You'll see the variant fields auto-populate with your content
+7. Modify the **title** in the variant section (e.g., change "Hello World" to "Hello Universe!")
+8. Save your post
+
+### Step 3: Display the Variant in Your Frontend
+
+Create a simple page to test the A/B functionality:
+
+```tsx
+// app/test-ab/page.tsx
+import { cookies } from 'next/headers'
+import { getServerSideABVariant } from 'payload-ab/server'
+
+// Your document type (simplified)
+type Post = {
+  id: string
+  title: string
+  content: any
+  enableABTesting?: boolean
+  abVariant?: Partial<Post>
+  [key: string]: unknown
+}
+
+export default async function TestABPage() {
+  // In a real app, fetch this from your Payload API
+  const mockDocument: Post = {
+    id: '1',
+    title: 'Hello World',
+    content: 'Original content',
+    enableABTesting: true,
+    abVariant: {
+      title: 'Hello Universe!', // Your variant
+      content: 'Variant content',
+    },
+  }
+
+  const cookieStore = await cookies()
+  const content = await getServerSideABVariant(mockDocument, cookieStore)
+
+  return (
+    <div style={{ padding: '2rem', textAlign: 'center' }}>
+      <h1>{content.title}</h1>
+      <p>{content.content}</p>
+      <p style={{ fontSize: '0.8em', color: '#666' }}>
+        Refresh in different browsers to see variants!
+      </p>
+    </div>
+  )
+}
+```
+
+### Step 4: See It Working!
+
+1. Open your test page in a browser
+2. Open the same page in a **different browser** or **incognito window**
+3. You should see different titles: some show "Hello World" and others show "Hello Universe!"
+
+### Step 5: What's Next?
+
+🎉 **Congratulations!** You just created your first A/B test. Now you can:
+
+- **Add PostHog tracking** (see detailed setup below)
+- **Test more fields** beyond just title
+- **Use the TrackAB component** for conversion tracking
+- **Configure advanced field selection**
+
+Ready for production-level A/B testing? Continue reading the detailed guide below!
+
+---
+
 ## Quick Start
 
 ### 1. Add the plugin to your Payload config
@@ -214,23 +313,23 @@ export default buildConfig({
     abTestingPlugin({
       // Simple configuration with collection slugs
       collections: ['simple-collection'],
-      
+
       // OR advanced configuration with field selection
       collections: {
-        'posts': {
+        posts: {
           // Only include these specific fields in the variant
           fields: ['title', 'content', 'summary', 'image'],
         },
-        'pages': {
+        pages: {
           // Exclude specific fields from the variant
           excludeFields: ['id', 'createdAt', 'updatedAt', 'author'],
         },
-        'products': {
+        products: {
           // Disable A/B testing for this collection
           enabled: false,
-        }
+        },
       },
-      
+
       // Optional PostHog configuration
       posthog: {
         apiKey: process.env.NEXT_PUBLIC_POSTHOG_KEY,
@@ -311,11 +410,8 @@ export default function MyPage() {
   return (
     <>
       {/* Track that the user saw variant "red-button" for flag "homepage-cta" */}
-      <TrackAB 
-        flagKey="homepage-cta" 
-        variant="red-button" 
-      />
-      
+      <TrackAB flagKey="homepage-cta" variant="red-button" />
+
       {/* Your page content */}
       <h1>Welcome to my page</h1>
     </>
@@ -345,7 +441,7 @@ export function Providers({ children }: PropsWithChildren) {
   // Only initialize on the client side
   if (typeof window !== 'undefined') {
     const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY
-    
+
     if (posthogKey) {
       posthog.init(posthogKey, {
         api_host: 'https://app.posthog.com',
