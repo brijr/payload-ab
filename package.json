@@ -105,5 +105,6 @@
   "registry": "https://registry.npmjs.org/",
   "dependencies": {
     "lodash.merge": "^4.6.2"
-  }
+  },
+  "packageManager": "pnpm@10.12.4"
 }
