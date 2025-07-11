@@ -1,0 +1,24 @@
+### Get a feature flag
+GET http://localhost:3000/api/posthog/flags
+Content-Type: application/json
+
+###
+
+### Create or update a feature flag
+POST http://localhost:3000/api/posthog/feature-flags
+Content-Type: application/json
+
+{
+  "key": "posthog_ab_posts_3_1752000131487",
+  "collectionSlug": "posts",
+  "docId": ""
+}
+
+### Get a specific feature flag
+GET http://localhost:3000/api/posthog/flags/posthog_ab_posts_3_1752000131487
+Content-Type: application/json
+
+### Delete a feature flag
+DELETE http://localhost:3000/api/posthog/flags/159168
+
+Content-Type: application/json

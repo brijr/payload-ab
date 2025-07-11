@@ -98,6 +98,11 @@ export default buildConfig({
   },
   plugins: [
     abTestingPlugin({
+      posthog: {
+        apiKey: process.env.POSTHOG_PERSONAL_API_KEY || '',
+        projectId: process.env.POSTHOG_PROJECT_ID || '',
+        host: process.env.POSTHOG_HOST || 'https://us.posthog.com',
+      },
       collections: ['posts'],
     }),
   ],
@@ -106,4 +111,6 @@ export default buildConfig({
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
   },
+
+  serverURL: process.env.PAYLOAD_PUBLIC_SERVER_URL || 'http://localhost:3000',
 })
