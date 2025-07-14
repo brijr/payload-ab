@@ -665,8 +665,8 @@ pnpm dev
 
 Thank you to our contributors: 
 
-@IvanLeffalle -- [Ivan Leffalle](https://ivanleffalle-portfolio.vercel.app/)
-@Awinel -- [Benjamin Huerta](#)
+- @IvanLeffalle -- [Ivan Leffalle](https://ivanleffalle-portfolio.vercel.app/)
+- @Awinel -- [Benjamin Huerta](#)
 
 
 Contributions are welcome! Please feel free to submit a Pull Request.
