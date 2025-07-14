@@ -667,6 +667,7 @@ Thank you to our contributors:
 
 - @IvanLeffalle -- [Ivan Leffalle](https://ivanleffalle-portfolio.vercel.app/)
 - @Awinel -- [Benjamin Huerta](#)
+- @brijr -- [brijr.dev](https://brijr.dev)
 
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -674,5 +675,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 MIT
-
-Created by [Bridger Tower](https://bridger.to).
