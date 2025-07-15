@@ -23,6 +23,7 @@ export function withAuth(handler: SecureHandler) {
     if (typeof req.headers?.get === 'function') {
       authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization') ?? undefined
     } else if (req.headers && typeof req.headers === 'object') {
+      authHeader = (req.headers as any)['authorization'] || (req.headers as any)['Authorization']
     }
 
     if (authHeader !== `Bearer ${INTERNAL_TOKEN}`) {
