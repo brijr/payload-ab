@@ -24,6 +24,62 @@ npm install payload-ab
 yarn add payload-ab
 ```
 
+## Environment Variables
+
+The plugin requires several environment variables to function properly. Create a `.env.local` file in your project root with the following:
+
+### Required Variables
+
+```bash
+# PostHog Configuration (required for A/B testing functionality)
+POSTHOG_PERSONAL_API_KEY=your-posthog-personal-api-key
+POSTHOG_PROJECT_ID=your-posthog-project-id
+POSTHOG_HOST=https://us.posthog.com
+
+# Security (required for PostHog endpoint protection)
+INTERNAL_API_TOKEN=your-secure-internal-api-token
+
+# Database (required for Payload CMS)
+DATABASE_URI=mongodb://127.0.0.1/your-database-name
+
+# Payload CMS Configuration
+PAYLOAD_SECRET=your-payload-secret-key
+PAYLOAD_PUBLIC_SERVER_URL=http://localhost:3000
+```
+
+### Client-Side Variables
+
+For client-side PostHog integration (add to your `.env.local`):
+
+```bash
+# Client-side PostHog (for browser usage)
+NEXT_PUBLIC_POSTHOG_KEY=your-posthog-browser-key
+NEXT_PUBLIC_POSTHOG_HOST=https://us.posthog.com
+```
+
+### Environment Variable Details
+
+| Variable | Description | Required | Default |
+|----------|-------------|----------|---------|
+| `POSTHOG_PERSONAL_API_KEY` | PostHog personal API key for server-side operations | Yes | - |
+| `POSTHOG_PROJECT_ID` | Your PostHog project ID | Yes | - |
+| `POSTHOG_HOST` | PostHog host URL | No | `https://us.posthog.com` |
+| `INTERNAL_API_TOKEN` | Secure token for protecting PostHog endpoints | Yes | - |
+| `DATABASE_URI` | MongoDB connection string | Yes | - |
+| `PAYLOAD_SECRET` | Secret key for Payload CMS | Yes | - |
+| `PAYLOAD_PUBLIC_SERVER_URL` | Public URL for your Payload server | No | `http://localhost:3000` |
+| `NEXT_PUBLIC_POSTHOG_KEY` | Client-side PostHog key for browser | No | - |
+| `NEXT_PUBLIC_POSTHOG_HOST` | Client-side PostHog host | No | `https://us.posthog.com` |
+
+### Security Note
+
+The `INTERNAL_API_TOKEN` is a critical security measure added to protect the PostHog endpoints. This token should be:
+- A strong, randomly generated string
+- Kept secret and never committed to version control
+- The same token used in your application's API calls to PostHog endpoints
+
+**Important**: Without the `INTERNAL_API_TOKEN`, the PostHog endpoints will return a 500 error and A/B testing functionality will not work.
+
 ## PostHog Integration
 
 This plugin integrates with PostHog to provide analytics and feature flag functionality:
