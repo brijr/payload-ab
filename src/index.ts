@@ -2,15 +2,15 @@ import type { CollectionConfig, Config, DescriptionFunction, Field, GroupField }
 
 // Import Endpoints for PostHog API management - NOW IMPORT THE FUNCTION
 import { createPostHogEndpoints } from './endpoints/posthog.js'
-
 import {
-  FieldWithRequired,
   BeforeChangeHookArgs,
+  FieldWithRequired,
   ConfigWithHooks,
   ABTestingPluginOptions,
   ABCollectionConfig,
   PostHogConfig,
 } from './types/index.js'
+
 type BeforeChangeHook = (args: BeforeChangeHookArgs) => Promise<Record<string, unknown> | void>
 
 /**
