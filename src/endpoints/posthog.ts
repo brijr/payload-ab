@@ -1,4 +1,41 @@
 import { PostHogConfig } from '../types/index.js'
+import type { PayloadRequest } from 'payload'
+
+type SecureHandler = (req: PayloadRequest, ...args: any[]) => Promise<Response>
+
+export function withAuth(handler: SecureHandler) {
+  return async (req: PayloadRequest, ...args: any[]) => {
+    const INTERNAL_TOKEN = process.env.INTERNAL_API_TOKEN
+
+    if (!INTERNAL_TOKEN) {
+      console.error('❌ INTERNAL_API_TOKEN is not set in environment')
+      return new Response(
+        JSON.stringify({ error: 'Internal API token not configured on server' }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      )
+    }
+
+    // Try to get Authorization header from Fetch or Express-like headers
+    let authHeader: string | undefined
+    if (typeof req.headers?.get === 'function') {
+      authHeader = req.headers.get('authorization') ?? req.headers.get('Authorization') ?? undefined
+    } else if (req.headers && typeof req.headers === 'object') {
+      authHeader = (req.headers as any)['authorization'] || (req.headers as any)['Authorization']
+    }
+
+    if (authHeader !== `Bearer ${INTERNAL_TOKEN}`) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    return handler(req, ...args)
+  }
+}
 
 export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
   const posthogApiKey = posthogConfig?.apiKey || process.env.POSTHOG_PERSONAL_API_KEY || ''
@@ -76,7 +113,7 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
     {
       path: '/posthog/flags',
       method: 'get',
-      handler: async () => {
+      handler: withAuth(async (req) => {
         try {
           validatePostHogConfig()
 
@@ -120,28 +157,25 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
             },
           )
         }
-      },
+      }),
     },
 
     // Create or update a feature flag
     {
       path: '/posthog/feature-flags',
       method: 'post',
-      handler: async (request: {
-        json: () => any
-        body: BodyInit | null | undefined
-        text: () => any
-        clone: () => any
-      }) => {
+      handler: withAuth(async (req) => {
+
         try {
           validatePostHogConfig()
 
-          const body = await parseRequestBody(request)
-          //console.log('Parsed request body:', body)
+          // Ensure parseRequestBody always returns an object, even if req.json is undefined
+          const body = (await parseRequestBody(req as any)) || {}
 
-          const { key, name, variantName, docId } = body
-
-          // Debug log the extracted values
+          const key = body?.key
+          const name = body?.name
+          const variantName = body?.variantName
+          const docId = body?.docId
           //console.log('Extracted values:', { key, name, variantName, docId })
 
           // Validate required parameters - Fixed logic
@@ -294,23 +328,18 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
             },
           )
         }
-      },
+      }),
     },
 
     // Deactivate a feature flag
     {
       path: '/posthog/feature-flags/deactivate',
       method: 'post',
-      handler: async (request: {
-        json: () => any
-        body: BodyInit | null | undefined
-        text: () => any
-        clone: () => any
-      }) => {
+      handler: withAuth(async (req) => {
         try {
           validatePostHogConfig()
 
-          const body = await parseRequestBody(request)
+          const body = await parseRequestBody(req as any)
           const { featureFlagKey } = body
 
           if (!featureFlagKey) {
@@ -409,7 +438,7 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
             },
           )
         }
-      },
+      }),
     },
   ]
 }
