@@ -1,5 +1,6 @@
-import { PostHogConfig } from '../types/index.js'
 import type { PayloadRequest } from 'payload'
+
+import type { PostHogConfig } from '../types/index.js'
 
 type SecureHandler = (req: PayloadRequest, ...args: any[]) => Promise<Response>
 
@@ -12,8 +13,8 @@ export function withAuth(handler: SecureHandler) {
       return new Response(
         JSON.stringify({ error: 'Internal API token not configured on server' }),
         {
-          status: 500,
           headers: { 'Content-Type': 'application/json' },
+          status: 500,
         },
       )
     }
@@ -28,8 +29,8 @@ export function withAuth(handler: SecureHandler) {
 
     if (authHeader !== `Bearer ${INTERNAL_TOKEN}`) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
         headers: { 'Content-Type': 'application/json' },
+        status: 401,
       })
     }
 
@@ -44,10 +45,10 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
 
   // Helper function to parse request body consistently
   const parseRequestBody = async (request: {
-    json: () => any
     body: BodyInit | null | undefined
-    text: () => any
     clone: () => any
+    json: () => any
+    text: () => any
   }) => {
     try {
       // For Payload/Next.js requests, try multiple approaches
@@ -111,8 +112,6 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
   return [
     // Fetch all feature flags
     {
-      path: '/posthog/flags',
-      method: 'get',
       handler: withAuth(async (req) => {
         try {
           validatePostHogConfig()
@@ -120,8 +119,8 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
           const response = await fetch(
             `${posthogApiHost}/api/projects/${posthogProjectId}/feature_flags/`,
             {
-              method: 'GET',
               headers: createPostHogHeaders(),
+              method: 'GET',
             },
           )
 
@@ -130,20 +129,20 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
             console.error(`PostHog API error ${response.status}: ${errorText}`)
             return new Response(
               JSON.stringify({
-                error: 'Failed to fetch flags from PostHog',
                 details: errorText,
+                error: 'Failed to fetch flags from PostHog',
               }),
               {
-                status: response.status,
                 headers: { 'Content-Type': 'application/json' },
+                status: response.status,
               },
             )
           }
 
           const data = await response.json()
           return new Response(JSON.stringify(data), {
-            status: 200,
             headers: { 'Content-Type': 'application/json' },
+            status: 200,
           })
         } catch (error) {
           console.error('Error in /posthog/flags GET:', error)
@@ -152,18 +151,18 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
               error: error instanceof Error ? error.message : 'Internal server error',
             }),
             {
-              status: 500,
               headers: { 'Content-Type': 'application/json' },
+              status: 500,
             },
           )
         }
       }),
+      method: 'get',
+      path: '/posthog/flags',
     },
 
     // Create or update a feature flag
     {
-      path: '/posthog/feature-flags',
-      method: 'post',
       handler: withAuth(async (req) => {
 
         try {
@@ -184,11 +183,11 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
             return new Response(
               JSON.stringify({
                 error: 'Missing feature flag key or document details for A/B flag management',
-                received: { key, docId },
+                received: { docId, key },
               }),
               {
-                status: 400,
                 headers: { 'Content-Type': 'application/json' },
+                status: 400,
               },
             )
           }
@@ -205,9 +204,9 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
 
           // Create feature flag configuration
           const featureFlagConfig = {
-            key: featureFlagKey,
             name: flagName,
             active: true,
+            ensure_persistence: true,
             filters: {
               groups: [
                 {
@@ -218,27 +217,27 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
               multivariate: {
                 variants: [
                   {
-                    key: 'control',
                     name: 'Control',
+                    key: 'control',
                     rollout_percentage: 50,
                   },
                   {
-                    key: variantKey,
                     name: variantKey.charAt(0).toUpperCase() + variantKey.slice(1),
+                    key: variantKey,
                     rollout_percentage: 50,
                   },
                 ],
               },
             },
-            ensure_persistence: true,
+            key: featureFlagKey,
           }
 
           // Check if flag already exists
           const existingFlagResponse = await fetch(
             `${posthogApiHost}/api/projects/${posthogProjectId}/feature_flags/?key=${featureFlagKey}`,
             {
-              method: 'GET',
               headers: createPostHogHeaders(),
+              method: 'GET',
             },
           )
 
@@ -260,13 +259,13 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
             const updateResponse = await fetch(
               `${posthogApiHost}/api/projects/${posthogProjectId}/feature_flags/${existingFlag.id}/`,
               {
-                method: 'PATCH',
-                headers: createPostHogHeaders(),
                 body: JSON.stringify({
                   name: featureFlagConfig.name,
-                  filters: featureFlagConfig.filters,
                   active: true,
+                  filters: featureFlagConfig.filters,
                 }),
+                headers: createPostHogHeaders(),
+                method: 'PATCH',
               },
             )
 
@@ -286,9 +285,9 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
             const createResponse = await fetch(
               `${posthogApiHost}/api/projects/${posthogProjectId}/feature_flags/`,
               {
-                method: 'POST',
-                headers: createPostHogHeaders(),
                 body: JSON.stringify(featureFlagConfig),
+                headers: createPostHogHeaders(),
+                method: 'POST',
               },
             )
 
@@ -306,14 +305,14 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
 
           return new Response(
             JSON.stringify({
-              message: 'Feature flag processed successfully',
-              featureFlag: apiResponse,
               action: existingFlag ? 'updated' : 'created',
+              featureFlag: apiResponse,
               key: featureFlagKey,
+              message: 'Feature flag processed successfully',
             }),
             {
-              status: responseStatus,
               headers: { 'Content-Type': 'application/json' },
+              status: responseStatus,
             },
           )
         } catch (error) {
@@ -323,18 +322,18 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
               error: error instanceof Error ? error.message : 'Internal server error',
             }),
             {
-              status: 500,
               headers: { 'Content-Type': 'application/json' },
+              status: 500,
             },
           )
         }
       }),
+      method: 'post',
+      path: '/posthog/feature-flags',
     },
 
     // Deactivate a feature flag
     {
-      path: '/posthog/feature-flags/deactivate',
-      method: 'post',
       handler: withAuth(async (req) => {
         try {
           validatePostHogConfig()
@@ -348,8 +347,8 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
                 error: 'Missing feature flag key for deactivation',
               }),
               {
-                status: 400,
                 headers: { 'Content-Type': 'application/json' },
+                status: 400,
               },
             )
           }
@@ -358,8 +357,8 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
           const getResponse = await fetch(
             `${posthogApiHost}/api/projects/${posthogProjectId}/feature_flags/?key=${featureFlagKey}`,
             {
-              method: 'GET',
               headers: createPostHogHeaders(),
+              method: 'GET',
             },
           )
 
@@ -370,12 +369,12 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
             )
             return new Response(
               JSON.stringify({
-                error: `Failed to find flag ${featureFlagKey} for deactivation`,
                 details: errorText,
+                error: `Failed to find flag ${featureFlagKey} for deactivation`,
               }),
               {
-                status: getResponse.status,
                 headers: { 'Content-Type': 'application/json' },
+                status: getResponse.status,
               },
             )
           }
@@ -389,8 +388,8 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
                 message: `Feature flag ${featureFlagKey} not found`,
               }),
               {
-                status: 200, // Still 200 if not found, but not an error
                 headers: { 'Content-Type': 'application/json' },
+                status: 200, // Still 200 if not found, but not an error
               },
             )
           }
@@ -399,9 +398,9 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
           const deactivateResponse = await fetch(
             `${posthogApiHost}/api/projects/${posthogProjectId}/feature_flags/${existingFlag.id}/`,
             {
-              method: 'PATCH',
-              headers: createPostHogHeaders(),
               body: JSON.stringify({ active: false }),
+              headers: createPostHogHeaders(),
+              method: 'PATCH',
             },
           )
 
@@ -417,13 +416,13 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
 
           return new Response(
             JSON.stringify({
-              message: 'Feature flag deactivated successfully',
               featureFlag: apiResponse,
               key: featureFlagKey,
+              message: 'Feature flag deactivated successfully',
             }),
             {
-              status: 200,
               headers: { 'Content-Type': 'application/json' },
+              status: 200,
             },
           )
         } catch (error) {
@@ -433,12 +432,14 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
               error: error instanceof Error ? error.message : 'Internal server error',
             }),
             {
-              status: 500,
               headers: { 'Content-Type': 'application/json' },
+              status: 500,
             },
           )
         }
       }),
+      method: 'post',
+      path: '/posthog/feature-flags/deactivate',
     },
   ]
 }

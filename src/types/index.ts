@@ -1,4 +1,4 @@
-import type { Field, AfterErrorHook, CollectionConfig, Config, PayloadRequest } from 'payload'
+import type { AfterErrorHook, CollectionConfig, Config, Field, PayloadRequest } from 'payload'
 
 export type FieldWithRequired = {
   required?: boolean

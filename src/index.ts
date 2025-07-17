@@ -1,15 +1,16 @@
 import type { CollectionConfig, Config, DescriptionFunction, Field, GroupField } from 'payload'
 
-// Import Endpoints for PostHog API management - NOW IMPORT THE FUNCTION
-import { createPostHogEndpoints } from './endpoints/posthog.js'
-import {
-  BeforeChangeHookArgs,
-  FieldWithRequired,
-  ConfigWithHooks,
-  ABTestingPluginOptions,
+import type {
   ABCollectionConfig,
+  ABTestingPluginOptions,
+  BeforeChangeHookArgs,
+  ConfigWithHooks,
+  FieldWithRequired,
   PostHogConfig,
 } from './types/index.js'
+
+// Import Endpoints for PostHog API management - NOW IMPORT THE FUNCTION
+import { createPostHogEndpoints } from './endpoints/posthog.js'
 
 type BeforeChangeHook = (args: BeforeChangeHookArgs) => Promise<Record<string, unknown> | void>
 
@@ -37,13 +38,13 @@ export const abTestingPlugin =
         // Ensure the 'method' property is properly typed for Payload's Endpoint type
         handler: endpoint.handler as any, // Type assertion to bypass type incompatibility
         method: endpoint.method.toLowerCase() as
-          | 'get'
-          | 'post'
           | 'connect'
           | 'delete'
+          | 'get'
           | 'head'
           | 'options'
           | 'patch'
+          | 'post'
           | 'put',
       }),
     )
@@ -527,9 +528,9 @@ export const abTestingPlugin =
         req: any,
       ): Promise<void> {
         try {
-          let featureFlagKey = currentData.posthogFeatureFlagKey as string | undefined
-          let featureFlagName = currentData.posthogFeatureFlagName as string | undefined
-          let variantName = (currentData.posthogVariantName as string) || 'variant'
+          const featureFlagKey = currentData.posthogFeatureFlagKey as string | undefined
+          const featureFlagName = currentData.posthogFeatureFlagName as string | undefined
+          const variantName = (currentData.posthogVariantName as string) || 'variant'
           // Generate feature flag key if not provided (It is not necessary since this is done by the endpoint)
           // if (!featureFlagKey) {
           //   const docId = originalDoc?._id || originalDoc?.id || currentData.id || Date.now()
@@ -542,13 +543,13 @@ export const abTestingPlugin =
 
           // Prepare the payload for the PostHog endpoint
           const postHogPayload = {
-            key: featureFlagKey,
             name: featureFlagName,
+            key: featureFlagKey,
             // (originalDoc?.title as string) ||
             // (currentData.title as string) ||
             // `A/B Test: ${collectionSlug}`,
-            variantName: variantName,
             docId: originalDoc?._id || originalDoc?.id || currentData.id,
+            variantName,
           }
 
           req.payload.logger.info(
@@ -567,12 +568,12 @@ export const abTestingPlugin =
           const response = await fetch(
             `${req.payload.config.serverURL}/api/posthog/feature-flags`,
             {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${process.env.INTERNAL_API_TOKEN}`,
-              },
               body: JSON.stringify(postHogPayload),
+              headers: {
+                Authorization: `Bearer ${process.env.INTERNAL_API_TOKEN}`,
+                'Content-Type': 'application/json',
+              },
+              method: 'POST',
             },
           )
           req.payload.logger.info(`[A/B Plugin] Server URL: ${req.payload.config.serverURL}`)
