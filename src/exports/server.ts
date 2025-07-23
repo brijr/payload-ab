@@ -1,13 +1,46 @@
-/**
- * Server-side helper for determining which A/B test variant to serve
- * For use in Next.js App Router with React Server Components
- *
- * @param document The document from Payload CMS containing A/B testing data
- * @param cookies The cookies object from Next.js (from cookies() function)
- * @returns The content to display (either the variant or the original)
- */
 import merge from 'lodash.merge'
+import { PostHog } from 'posthog-node'
 
+// --- NEW: Generic Cookie Accessor Interface ---
+export interface CookieAccessor {
+  get: (name: string) => { value: string } | undefined
+  set: (
+    name: string,
+    value: string,
+    options?: {
+      path?: string
+      expires?: Date
+      maxAge?: number
+      domain?: string
+      secure?: boolean
+      httpOnly?: boolean
+      sameSite?: 'strict' | 'lax' | 'none'
+    },
+  ) => void // Re-added 'set' temporarily for clarity if needed elsewhere, but it's not used in getServerSideABVariant directly now.
+}
+
+// --- Define the type for the returned document, including the assigned variant key and cookie info ---
+export type ABTestedDocument<T extends Record<string, unknown>> = T & {
+  posthogAssignedVariantKey?: string // The variant assigned by PostHog
+  posthogFeatureFlagKeyUsed?: string
+  posthogServerDistinctId?: string // The distinctId determined on the server
+  posthogNewDistinctIdGenerated?: string // Only present if a new ID was generated
+}
+
+// --- Initialize PostHog server-side client ---
+const posthogClient = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY || '', {
+  host: process.env.POSTHOG_HOST || 'https://app.posthog.com',
+})
+
+/**
+ * Server-side helper to determine which A/B test variant to serve.
+ * It reads cookies but DOES NOT set them directly. Cookie setting is delegated
+ * to a Server Action or Route Handler.
+ *
+ * @param document The original Payload CMS document.
+ * @param cookies The cookies object from Next.js `cookies()`.
+ * @returns The content to display (either the variant or the original), augmented with PostHog details for client-side cookie setting.
+ */
 export const getServerSideABVariant = async <
   D extends {
     abVariant?: Record<string, unknown>
@@ -17,53 +50,74 @@ export const getServerSideABVariant = async <
   T extends Record<string, unknown> = Record<string, unknown>,
 >(
   document: D & T,
-  cookies: { get: (name: string) => { value: string } | undefined },
-): Promise<T> => {
+  cookies: CookieAccessor, // Using the generic CookieAccessor interface
+): Promise<ABTestedDocument<T>> => {
   // If A/B testing is not enabled, return the original document
+
   if (!document?.enableABTesting || !document.abVariant) {
     return document
   }
 
+  const featureFlagKey = document.posthogFeatureFlagKey || `ab_test_${String(document.id)}`
+  let assignedVariantKey: string = 'control'
+  let finalDocument: T = document
+
+  let distinctId = cookies.get('_ph_id')?.value
+  let newDistinctIdGenerated: string | undefined
+
   try {
-    // Get the feature flag key (use the provided one or generate one)
-    const featureFlagKey = document.posthogFeatureFlagKey || `ab_test_${String(document.id)}`
-
-    // Check for existing PostHog distinct_id cookie
-    const distinctIdCookie = await Promise.resolve(cookies.get('ph_distinct_id'))
-
-    // Use the cookie value or generate a test ID for development
-    const distinctId =
-      distinctIdCookie?.value || `test_${Math.random().toString(36).substring(2, 15)}`
-
-    // Simple hash function to determine variant assignment
-    // This is a basic implementation - PostHog would handle this more robustly
-    const hashCode = (str: string) => {
-      let hash = 0
-      for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i)
-        hash = (hash << 5) - hash + char
-        hash = hash & hash // Convert to 32bit integer
-      }
-      return hash
+    if (!distinctId) {
+      newDistinctIdGenerated = crypto.randomUUID()
+      distinctId = newDistinctIdGenerated // Use the newly generated ID for flag evaluation
     }
 
-    // Create a hash based on the distinct_id and feature flag key
-    const hash = hashCode(`${distinctId}:${featureFlagKey}`)
+    // // --- IMPORTANT DEBUGGING LINES (keeping for now, I'll delete later when I'm sure it's working in production) ---
+    // console.log('--- PostHog Server Init Debug ---')
+    // console.log('POSTHOG_API_KEY (used for evaluation):', process.env.NEXT_PUBLIC_POSTHOG_KEY)
+    // console.log('POSTHOG_HOST:', process.env.NEXT_PUBLIC_POSTHOG_HOST)
+    // console.log('---------------------------------')
+    // console.log(
+    //   `[A/B Plugin] Server-side: Attempting to fetch flag "${featureFlagKey}" for distinct ID "${distinctId}".`,
+    // )
+    // const allFlags = await posthogClient.getAllFlags(distinctId); // Optional: if you want to see all flags
+    // console.log(`[A/B Plugin] Server-side: All flags for distinct ID "${distinctId}":`, JSON.stringify(allFlags, null, 2));
+    // --- END IMPORTANT DEBUGGING LINES ---
 
-    // Determine if user should see variant (50/50 split)
-    const showVariant = Math.abs(hash) % 2 === 0
-
-    if (showVariant) {
-      console.log(`[A/B Plugin] Serving variant for user ${distinctId} on flag ${featureFlagKey}`)
-      return merge({}, document, document.abVariant)
+    const flagResponse = await posthogClient.getFeatureFlag(featureFlagKey, distinctId)
+    console.log('Raw flag response:', flagResponse, 'Type:', typeof flagResponse)
+    // Handle both boolean and string variants
+    // Handle all possible response types
+    if (flagResponse === false || flagResponse === null || flagResponse === undefined) {
+      assignedVariantKey = 'control'
+    } else if (flagResponse === true) {
+      assignedVariantKey = 'variant'
+    } else if (typeof flagResponse === 'string') {
+      // Use the exact string returned by PostHog
+      assignedVariantKey = flagResponse
     } else {
-      console.log(`[A/B Plugin] Serving control for user ${distinctId} on flag ${featureFlagKey}`)
+      assignedVariantKey = 'control' // fallback
     }
-  } catch (_error) {
-    // In case of error, return the original document
-    // Using a more TypeScript-friendly approach instead of console.error
+    if (assignedVariantKey === 'variant') {
+      finalDocument = merge({}, document, document.abVariant) as T
+    } else {
+      finalDocument = document
+    }
+
+    // console.log(
+    //   `[A/B Plugin] Server-side: Flag "${featureFlagKey}" assigned "${assignedVariantKey}" for distinct ID "${distinctId}".`,
+    // )
+  } catch (error) {
+    // console.error(`[A/B Plugin] Server-side error for flag "${featureFlagKey}":`, error)
+    assignedVariantKey = 'control'
+    finalDocument = document
+    if (!distinctId) distinctId = crypto.randomUUID()
   }
 
-  // Default to original document
-  return document
+  return {
+    ...finalDocument,
+    posthogAssignedVariantKey: assignedVariantKey,
+    posthogFeatureFlagKeyUsed: featureFlagKey,
+    posthogServerDistinctId: distinctId,
+    posthogNewDistinctIdGenerated: newDistinctIdGenerated,
+  }
 }
