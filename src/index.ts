@@ -319,39 +319,45 @@ export const abTestingPlugin =
           tabs: [
             // Original tab for content
             {
-              fields: collection.fields || [],
+              fields: [
+                // Add the enableABTesting checkbox here so it's always visible
+                {
+                  name: 'enableABTesting',
+                  type: 'checkbox',
+                  admin: {
+                    description:
+                      'Check this box to create an A/B testing variant for this document',
+                    position: 'sidebar',
+                  },
+                  defaultValue: false,
+                  label: 'Enable A/B Testing',
+                },
+                ...(collection.fields || []), // Keep original fields
+              ],
               label: 'Content',
             },
-            // The new tab for experiments
-
             // The existing tab for A/B testing variant configuration
             {
               admin: {
                 condition: (data) => data?.enableABTesting === true,
               },
-              description:
-                'Configure A/B testing variants for this content. Enable A/B testing to start the experiment.',
+              description: 'Configure A/B testing variants for this content',
               fields: [
-                enableABTestingField,
                 ...posthogFields,
                 {
                   name: 'abVariant',
                   type: 'group',
                   admin: {
                     className: 'ab-variant-group',
-                    condition: (data) => data?.enableABTesting === true,
                     description:
                       'Configure your A/B testing variant content here' as unknown as DescriptionFunction,
                   },
                   fields: variantFields,
                   hooks: {
-                    // Add a hook to sanitize the variant data before it's saved
                     beforeValidate: [
                       ({ value }) => {
-                        // If the value is an object, ensure it doesn't have any system fields
                         if (value && typeof value === 'object') {
-                          const sanitizedValue = sanitizeObject(value)
-                          return sanitizedValue
+                          return sanitizeObject(value)
                         }
                         return value
                       },
@@ -370,13 +376,73 @@ export const abTestingPlugin =
               admin: {
                 condition: (data) => data?.enableABTesting === true,
               },
-              description:
-                'Configure experiment-specific settings. This data is used for tracking and analytics purposes.',
+              description: 'Configure experiment-specific settings',
               fields: [...experimentFields],
               label: '📊 Experiments',
             },
           ],
         }
+        // const allTabs: Field = {
+        //   type: 'tabs',
+        //   tabs: [
+        //     // Original tab for content
+        //     {
+        //       fields: collection.fields || [],
+        //       label: 'Content',
+        //     },
+        //     // The existing tab for A/B testing variant configuration
+        //     {
+        //       admin: {
+        //         condition: (data) => data?.enableABTesting === true,
+        //       },
+        //       description:
+        //         'Configure A/B testing variants for this content. Enable A/B testing to start the experiment.',
+        //       fields: [
+        //         enableABTestingField,
+        //         ...posthogFields,
+        //         {
+        //           name: 'abVariant',
+        //           type: 'group',
+        //           admin: {
+        //             className: 'ab-variant-group',
+        //             condition: (data) => data?.enableABTesting === true,
+        //             description:
+        //               'Configure your A/B testing variant content here' as unknown as DescriptionFunction,
+        //           },
+        //           fields: variantFields,
+        //           hooks: {
+        //             // Add a hook to sanitize the variant data before it's saved
+        //             beforeValidate: [
+        //               ({ value }) => {
+        //                 // If the value is an object, ensure it doesn't have any system fields
+        //                 if (value && typeof value === 'object') {
+        //                   const sanitizedValue = sanitizeObject(value)
+        //                   return sanitizedValue
+        //                 }
+        //                 return value
+        //               },
+        //             ],
+        //           },
+        //           label: '🎯 Variant Content',
+        //           localized: false,
+        //           nullable: true,
+        //           required: false,
+        //           unique: false,
+        //         } as GroupField,
+        //       ],
+        //       label: '📊 A/B Testing',
+        //     },
+        //     {
+        //       admin: {
+        //         condition: (data) => data?.enableABTesting === true,
+        //       },
+        //       description:
+        //         'Configure experiment-specific settings. This data is used for tracking and analytics purposes.',
+        //       fields: [...experimentFields],
+        //       label: '📊 Experiments',
+        //     },
+        //   ],
+        // }
         // Create a tabs field with an A/B Testing tab
         // const abTestingTab: Field = {
         //   type: 'tabs',
@@ -423,7 +489,7 @@ export const abTestingPlugin =
         //           unique: false,
         //         } as GroupField,
         //       ],
-        //       label: '� A/B Testing',
+        //       label: ' A/B Testing',
         //     },
         //   ],
         // }
@@ -625,6 +691,50 @@ export const abTestingPlugin =
                 `[A/B Plugin] A/B testing already enabled for ${collectionSlug}, preserving existing variant content`,
               )
             }
+
+            // --- INICIO: NUEVA LÓGICA PARA EL FILTRO DE URL AUTOMÁTICO ---
+            // Verifica si A/B testing está habilitado y si el filtro de URL está vacío.
+            if (currentData.enableABTesting && !currentData.experimentUrlFilter) {
+              let host = 'runway.ac'
+              // Simula la lógica de Live Preview para obtener el host
+              if (currentData.brand) {
+                const brandDoc = await req.payload.findByID({
+                  //@ts-ignore
+                  id: currentData.brand,
+                  collection: 'brands',
+                })
+                host = brandDoc?.host || host
+              }
+
+              const docSlug = (currentData.slug as string) || (originalDoc?.slug as string)
+
+              if (host && docSlug) {
+                let slugPath = ''
+
+                if (collectionSlug === 'advertorials') {
+                  slugPath = `/a/${docSlug}`
+                } else if (collectionSlug === 'thankYouPages') {
+                  slugPath = `/t/${docSlug}`
+                } else if (collectionSlug === 'vsl') {
+                  slugPath = `/v/${docSlug}`
+                } else {
+                  slugPath = docSlug !== 'home' ? `/${docSlug}` : ''
+                }
+
+                // Escapa los caracteres especiales para la regex
+                const escapedHost = host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                const escapedSlugPath = slugPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+                // Crea la expresión regular completa
+                const newUrlFilter = `^https?://(?:www\\.)?${escapedHost}${escapedSlugPath}(?:\\?.*)?$`
+
+                currentData.experimentUrlFilter = newUrlFilter
+                req.payload.logger.info(
+                  `[A/B Plugin] Filtro de URL generado automáticamente: ${newUrlFilter}`,
+                )
+              }
+            }
+            // --- FIN: NUEVA LÓGICA ---
 
             // PostHog Feature Flag Management
             // --- UPDATED: Pass experimentUrlFilter to the handler ---
