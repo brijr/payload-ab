@@ -246,6 +246,7 @@ export const abTestingPlugin =
           },
         ]
 
+        // --- START: MODIFIED EXPERIMENT FIELDS ---
         const experimentFields: Field[] = [
           {
             name: 'experimentName',
@@ -259,7 +260,59 @@ export const abTestingPlugin =
             label: 'Experiment Name',
             required: false,
           },
+          {
+            name: 'experimentDescription',
+            type: 'textarea',
+            admin: {
+              condition: (data) => data?.enableABTesting === true,
+              description:
+                'A description of the experiment. This helps you remember what the test is for.',
+              position: 'sidebar',
+            },
+            label: 'Experiment Description',
+            required: false,
+          },
+          {
+            name: 'experimentMetrics',
+            type: 'array',
+            admin: {
+              condition: (data) => data?.enableABTesting === true,
+              description:
+                'Define the metrics to track for this experiment. Each metric requires a name and an event.',
+              position: 'sidebar',
+            },
+            fields: [
+              {
+                name: 'name',
+                type: 'text',
+                label: 'Metric Name',
+                required: true,
+              },
+              {
+                name: 'event',
+                type: 'text',
+                label: 'Event Name',
+                required: true,
+              },
+            ],
+            label: 'Experiment Metrics',
+            required: false,
+          },
+          {
+            name: 'experimentUrlFilter',
+            type: 'text',
+            admin: {
+              condition: (data) => data?.enableABTesting === true,
+              description:
+                'Regular expression for the URL where the experiment should run. The URL must match this expression to be part of the experiment. Leave blank to run the experiment on all pages.',
+              position: 'sidebar',
+            },
+            label: 'URL Filter (Regex)',
+            required: false,
+          },
         ]
+        // --- END: MODIFIED EXPERIMENT FIELDS ---
+
         // This is the new, single tabs field
         const allTabs: Field = {
           type: 'tabs',
@@ -370,7 +423,7 @@ export const abTestingPlugin =
         //           unique: false,
         //         } as GroupField,
         //       ],
-        //       label: '📊 A/B Testing',
+        //       label: '� A/B Testing',
         //     },
         //   ],
         // }
@@ -574,7 +627,33 @@ export const abTestingPlugin =
             }
 
             // PostHog Feature Flag Management
-            await handlePostHogFeatureFlag(currentData, originalDoc, collectionSlug, req)
+            // --- UPDATED: Pass experimentUrlFilter to the handler ---
+            await handlePostHogFeatureFlag(
+              currentData,
+              originalDoc,
+              collectionSlug,
+              req,
+              currentData.experimentUrlFilter as string,
+            )
+
+            // NEW LOGIC: Automatically populate the experimentName field
+            // If A/B testing is enabled and the experimentName field is empty,
+            // set it to the value of the posthogFeatureFlagKey.
+            // This provides a default value while still allowing manual overrides.
+            if (
+              currentData.enableABTesting &&
+              currentData.posthogFeatureFlagKey &&
+              !currentData.experimentName
+            ) {
+              currentData.experimentName = currentData.posthogFeatureFlagKey
+              req.payload.logger.info(
+                `[A/B Plugin] Automatically populated experimentName with feature flag key: ${currentData.experimentName}`,
+              )
+            }
+            // --- START: NEW LOGIC FOR EXPERIMENTS ---
+            // PostHog Experiment Management
+            await handlePostHogExperiment(currentData, originalDoc, req)
+            // --- END: NEW LOGIC FOR EXPERIMENTS ---
           } else if (wasABTestingEnabled && !isABTestingEnabled) {
             // A/B testing is being disabled
             req.payload.logger.info(`[A/B Plugin] A/B testing disabled for ${collectionSlug}.`)
@@ -587,7 +666,6 @@ export const abTestingPlugin =
             //   await handlePostHogFeatureFlagDeactivation(currentData, req)
             // }
           }
-
           return currentData
         } catch (error) {
           req.payload.logger.error(
@@ -604,6 +682,7 @@ export const abTestingPlugin =
         originalDoc: any,
         collectionSlug: string,
         req: any,
+        experimentUrlFilter: string,
       ): Promise<void> {
         try {
           const featureFlagKey = currentData.posthogFeatureFlagKey as string | undefined
@@ -628,13 +707,15 @@ export const abTestingPlugin =
             // `A/B Test: ${collectionSlug}`,
             docId: originalDoc?._id || originalDoc?.id || currentData.id,
             variantName,
+            // --- NEW: Add the URL filter to the payload ---
+            urlFilter: experimentUrlFilter,
           }
 
           req.payload.logger.info(
             `[A/B Plugin] Calling PostHog endpoint to create/update feature flag: ${featureFlagKey}`,
           )
           req.payload.logger.info(
-            `[A/B Plugin] Full endpoint URL: ${req.payload.config.serverURL}/posthog/feature-flags`,
+            `[A/B Plugin] Full endpoint URL: ${req.payload.config.serverURL}/api/posthog/feature-flags`,
           )
           req.payload.logger.info(
             `[A/B Plugin] Request payload:`,
@@ -698,59 +779,127 @@ export const abTestingPlugin =
         }
       }
 
-      // Helper function to handle PostHog feature flag deactivation
-      // async function handlePostHogFeatureFlagDeactivation(
-      //   currentData: Record<string, unknown>,
-      //   req: any,
-      // ): Promise<void> {
-      //   try {
-      //     const featureFlagKey = currentData.posthogFeatureFlagKey as string
+      // --- START: NEW HELPER FUNCTION FOR EXPERIMENTS ---
+      async function handlePostHogExperiment(
+        currentData: Record<string, unknown>,
+        originalDoc: any,
+        req: any,
+      ): Promise<void> {
+        try {
+          const {
+            experimentDescription,
+            experimentMetrics,
+            experimentName,
+            posthogFeatureFlagKey,
+          } = currentData
 
-      //     req.payload.logger.info(
-      //       `[A/B Plugin] Calling PostHog endpoint to deactivate feature flag: ${featureFlagKey}`,
-      //     )
+          // We only create an experiment if there is at least one metric defined
+          if (
+            !experimentMetrics ||
+            !Array.isArray(experimentMetrics) ||
+            experimentMetrics.length === 0
+          ) {
+            req.payload.logger.info(
+              '[A/B Plugin] No experiment metrics defined. Skipping experiment creation.',
+            )
+            return
+          }
 
-      //     // FIXED: Use the correct endpoint path without /api prefix
-      //     const response = await fetch(
-      //       `${req.payload.config.serverURL}/posthog/feature-flags/deactivate`,
-      //       {
-      //         method: 'POST',
-      //         headers: {
-      //           'Content-Type': 'application/json',
-      //         },
-      //         body: JSON.stringify({
-      //           featureFlagKey: featureFlagKey,
-      //         }),
-      //       },
-      //     )
+          // Ensure we have a feature flag key, as it's required for the experiment
+          if (!posthogFeatureFlagKey) {
+            req.payload.logger.error(
+              '[A/B Plugin] Cannot create experiment: posthogFeatureFlagKey is missing.',
+            )
+            return
+          }
 
-      //     if (!response.ok) {
-      //       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-      //       req.payload.logger.error(
-      //         `[A/B Plugin] PostHog deactivation endpoint responded with error ${response.status}:`,
-      //         errorData,
-      //       )
-      //       // Don't throw here - deactivation failure shouldn't prevent document save
-      //     } else {
-      //       req.payload.logger.info(
-      //         `[A/B Plugin] PostHog feature flag ${featureFlagKey} deactivated successfully`,
-      //       )
-      //     }
-      //   } catch (error) {
-      //     req.payload.logger.error(
-      //       '[A/B Plugin] Error deactivating PostHog feature flag:',
-      //       error instanceof Error ? error.message : error,
-      //     )
-      //     // Don't throw here - deactivation failure shouldn't prevent document save
-      //   }
-      // }
+          // Use the document's updatedAt date as the start date
+          const startDate = originalDoc?.updatedAt
+            ? new Date(originalDoc.updatedAt).toISOString()
+            : new Date().toISOString()
 
-      // Add the hook to this specific collection
+          // Map the simple metrics array from Payload to the format PostHog expects
+          const formattedMetrics = experimentMetrics.map((metric) => ({
+            kind: 'ExperimentMetric',
+            // Generate a unique ID for each metric (a requirement of the PostHog API)
+            metric_type: 'funnel', // Assuming 'funnel' as a default for now
+            series: [
+              {
+                event: metric.event,
+                kind: 'EventsNode',
+                properties: [
+                  {
+                    type: 'event',
+                    key: 'flagKey',
+                    operator: 'exact',
+                    value: [posthogFeatureFlagKey],
+                  },
+                ],
+              },
+            ],
+            uuid: crypto.randomUUID(),
+          }))
+
+          // Prepare the payload for the PostHog experiments endpoint
+          const postHogExperimentPayload = {
+            name: experimentName || posthogFeatureFlagKey, // Use key as fallback
+            description: experimentDescription || `Experiment for ${posthogFeatureFlagKey}`,
+            feature_flag_key: posthogFeatureFlagKey,
+            filters: {}, // --- UPDATED: The filters are now handled by the feature flag endpoint
+            metrics: formattedMetrics,
+            start_date: startDate,
+          }
+
+          req.payload.logger.info(
+            '[A/B Plugin] Calling PostHog endpoint to create/update experiment',
+          )
+          req.payload.logger.info(
+            `[A/B Plugin] Full endpoint URL: ${req.payload.config.serverURL}/api/posthog/experiments`,
+          )
+          req.payload.logger.info(
+            `[A/B Plugin] Request payload:`,
+            JSON.stringify(postHogExperimentPayload, null, 2),
+          )
+
+          const response = await fetch(`${req.payload.config.serverURL}/api/posthog/experiments`, {
+            body: JSON.stringify(postHogExperimentPayload),
+            headers: {
+              Authorization: `Bearer ${process.env.INTERNAL_API_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+            method: 'POST',
+          })
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            let errorData
+            try {
+              errorData = JSON.parse(errorText)
+            } catch (e) {
+              errorData = { error: errorText }
+            }
+            throw new Error(
+              `PostHog Experiments API error: ${response.status} - ${JSON.stringify(errorData)}`,
+            )
+          }
+
+          const result = await response.json()
+          req.payload.logger.info(
+            `[A/B Plugin] PostHog experiment for flag "${posthogFeatureFlagKey}" created successfully with ID: ${result.id}`,
+          )
+        } catch (error) {
+          req.payload.logger.error(
+            '[A/B Plugin] Detailed error managing PostHog experiment:',
+            error instanceof Error ? error.message : error,
+          )
+          // Do not re-throw here, as experiment creation is secondary to the document save
+          // The document should still save even if the experiment fails to create
+        }
+      }
+      // --- END: NEW HELPER FUNCTION FOR EXPERIMENTS ---
+
       collection.hooks.beforeChange.push(copyToVariantHook)
     })
 
     return config
   }
-
-// For backward compatibility
-export default abTestingPlugin

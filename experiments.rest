@@ -1,0 +1,31 @@
+###
+# POST /posthog/experiments
+#
+# This request creates a new experiment in PostHog via your Payload endpoint.
+#
+# To use this file, replace the placeholder values below:
+# - {{host}}: The URL of your local Payload server (e.g., http://localhost:3000).
+# - {{INTERNAL_API_TOKEN}}: The value of your INTERNAL_API_TOKEN environment variable.
+# - The experiment's details in the JSON body.
+#
+GET http://localhost:3000/api/posthog/experiments
+Content-Type: application/json
+Authorization: Bearer 123456
+
+
+POST http://localhost:3000/api/posthog/experiments
+Content-Type: application/json
+Authorization: Bearer 123456
+
+{
+  "name": "My First A/B Test",
+  "description": "Testing a new user flow on the homepage.",
+  "start_date": "2025-08-14T15:00:00Z",
+  "feature_flag_key": "my-new-feature-flag",
+  "metrics": [
+    {
+      "name": "Sign-up Conversion",
+      "event": "user_signed_up"
+    }
+  ]
+}
