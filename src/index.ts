@@ -246,17 +246,36 @@ export const abTestingPlugin =
           },
         ]
 
-        // Create a tabs field with an A/B Testing tab
-        const abTestingTab: Field = {
+        const experimentFields: Field[] = [
+          {
+            name: 'experimentName',
+            type: 'text',
+            admin: {
+              condition: (data) => data?.enableABTesting === true,
+              description:
+                'Name of the A/B testing experiment. This is used for tracking and analytics purposes.',
+              position: 'sidebar',
+            },
+            label: 'Experiment Name',
+            required: false,
+          },
+        ]
+        // This is the new, single tabs field
+        const allTabs: Field = {
           type: 'tabs',
           tabs: [
-            // Keep the original tabs/fields as they are
+            // Original tab for content
             {
               fields: collection.fields || [],
               label: 'Content',
             },
-            // Add a new tab for A/B Testing
+            // The new tab for experiments
+
+            // The existing tab for A/B testing variant configuration
             {
+              admin: {
+                condition: (data) => data?.enableABTesting === true,
+              },
               description:
                 'Configure A/B testing variants for this content. Enable A/B testing to start the experiment.',
               fields: [
@@ -294,8 +313,67 @@ export const abTestingPlugin =
               ],
               label: '📊 A/B Testing',
             },
+            {
+              admin: {
+                condition: (data) => data?.enableABTesting === true,
+              },
+              description:
+                'Configure experiment-specific settings. This data is used for tracking and analytics purposes.',
+              fields: [...experimentFields],
+              label: '📊 Experiments',
+            },
           ],
         }
+        // Create a tabs field with an A/B Testing tab
+        // const abTestingTab: Field = {
+        //   type: 'tabs',
+        //   tabs: [
+        //     // Keep the original tabs/fields as they are
+        //     {
+        //       fields: collection.fields || [],
+        //       label: 'Content',
+        //     },
+        //     // Add a new tab for A/B Testing
+        //     {
+        //       description:
+        //         'Configure A/B testing variants for this content. Enable A/B testing to start the experiment.',
+        //       fields: [
+        //         enableABTestingField,
+        //         ...posthogFields,
+        //         {
+        //           name: 'abVariant',
+        //           type: 'group',
+        //           admin: {
+        //             className: 'ab-variant-group',
+        //             condition: (data) => data?.enableABTesting === true,
+        //             description:
+        //               'Configure your A/B testing variant content here' as unknown as DescriptionFunction,
+        //           },
+        //           fields: variantFields,
+        //           hooks: {
+        //             // Add a hook to sanitize the variant data before it's saved
+        //             beforeValidate: [
+        //               ({ value }) => {
+        //                 // If the value is an object, ensure it doesn't have any system fields
+        //                 if (value && typeof value === 'object') {
+        //                   const sanitizedValue = sanitizeObject(value)
+        //                   return sanitizedValue
+        //                 }
+        //                 return value
+        //               },
+        //             ],
+        //           },
+        //           label: '🎯 Variant Content',
+        //           localized: false,
+        //           nullable: true,
+        //           required: false,
+        //           unique: false,
+        //         } as GroupField,
+        //       ],
+        //       label: '📊 A/B Testing',
+        //     },
+        //   ],
+        // }
 
         // Return the modified collection with tabs
         return {
@@ -305,7 +383,7 @@ export const abTestingPlugin =
             // Ensure we preserve any existing useAsTitle setting
             useAsTitle: collection.admin?.useAsTitle || 'title',
           },
-          fields: [abTestingTab],
+          fields: [allTabs],
         }
       }
       return collection
