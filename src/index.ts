@@ -847,7 +847,7 @@ export const abTestingPlugin =
             feature_flag_key: posthogFeatureFlagKey,
             filters: {}, // --- UPDATED: The filters are now handled by the feature flag endpoint
             metrics: formattedMetrics,
-            start_date: startDate,
+            // start_date: startDate, // --- When no passing a start date, it will be saved as "draft" in PostHog
           }
 
           req.payload.logger.info(

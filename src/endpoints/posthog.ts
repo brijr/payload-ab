@@ -42,7 +42,12 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
   const posthogApiKey = posthogConfig?.apiKey || process.env.POSTHOG_PERSONAL_API_KEY || ''
   const posthogApiHost = posthogConfig?.host || process.env.POSTHOG_HOST || 'https://us.posthog.com'
   const posthogProjectId = posthogConfig?.projectId || process.env.POSTHOG_PROJECT_ID || ''
-
+  type PostHogPropertyFilter = {
+    key: string
+    operator: string
+    type: string
+    value: any
+  }
   // Helper function to parse request body consistently
   const parseRequestBody = async (request: {
     body: BodyInit | null | undefined
@@ -202,13 +207,23 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
           const flagName = name || `A/B Test: ${docId}`
           const variantKey = variantName || 'variant'
           // Start with a basic filters object
-          const filters = {
+
+          const filters: {
+            groups: {
+              properties: PostHogPropertyFilter[]
+              rollout_percentage: null | number
+            }[]
+            multivariate: {
+              variants: { key: string; name: string; rollout_percentage: number }[]
+            }
+          } = {
             groups: [
               {
                 properties: [],
                 rollout_percentage: null,
               },
             ],
+
             multivariate: {
               variants: [
                 {
