@@ -692,11 +692,11 @@ export const abTestingPlugin =
               )
             }
 
-            // --- INICIO: NUEVA LÓGICA PARA EL FILTRO DE URL AUTOMÁTICO ---
-            // Verifica si A/B testing está habilitado y si el filtro de URL está vacío.
+            // --- START: NEW LOGIC FOR THE AUTOMATIC URL FILTER ---
+            // Checks if A/B testing is enabled and if the URL filter is empty.
             if (currentData.enableABTesting && !currentData.experimentUrlFilter) {
               let host = 'runway.ac'
-              // Simula la lógica de Live Preview para obtener el host
+              // Simulates the Live Preview logic to get the host
               if (currentData.brand) {
                 const brandDoc = await req.payload.findByID({
                   //@ts-ignore
@@ -721,20 +721,20 @@ export const abTestingPlugin =
                   slugPath = docSlug !== 'home' ? `/${docSlug}` : ''
                 }
 
-                // Escapa los caracteres especiales para la regex
+                // Escape special characters for regex
                 const escapedHost = host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
                 const escapedSlugPath = slugPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-                // Crea la expresión regular completa
-                const newUrlFilter = `^https?://(?:www\\.)?${escapedHost}${escapedSlugPath}(?:\\?.*)?$`
+                // Create the complete regular expression
+                const newUrlFilter = `^https://${escapedHost}${escapedSlugPath}(?:\\?.*)?$`
 
                 currentData.experimentUrlFilter = newUrlFilter
                 req.payload.logger.info(
-                  `[A/B Plugin] Filtro de URL generado automáticamente: ${newUrlFilter}`,
+                  `[A/B Plugin] Automatically generated URL filter: ${newUrlFilter}`,
                 )
               }
             }
-            // --- FIN: NUEVA LÓGICA ---
+            // --- END: NEW LOGIC ---
 
             // PostHog Feature Flag Management
             // --- UPDATED: Pass experimentUrlFilter to the handler ---

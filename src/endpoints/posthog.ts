@@ -240,7 +240,7 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
             },
           }
 
-          // --- NUEVO: Agregar el filtro de URL si está presente
+          // --- NEW: Add URL filter if present
           if (urlFilter) {
             filters.groups[0].properties.push({
               type: 'person',
@@ -254,7 +254,7 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
             name: flagName,
             active: true,
             ensure_persistence: true,
-            filters, // Usar el objeto de filtros modificado
+            filters,
             key: featureFlagKey,
           }
           // Create feature flag configuration
