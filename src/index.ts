@@ -195,16 +195,16 @@ export const abTestingPlugin =
         }
 
         // Add a toggle field to enable/disable A/B testing for this document
-        const enableABTestingField: Field = {
-          name: 'enableABTesting',
-          type: 'checkbox',
-          admin: {
-            description: 'Check this box to create an A/B testing variant for this document',
-            position: 'sidebar',
-          },
-          defaultValue: false,
-          label: 'Enable A/B Testing',
-        }
+        // const enableABTestingField: Field = {
+        //   name: 'enableABTesting',
+        //   type: 'checkbox',
+        //   admin: {
+        //     description: 'Check this box to create an A/B testing variant for this document',
+        //     position: 'sidebar',
+        //   },
+        //   defaultValue: false,
+        //   label: 'Enable A/B Testing',
+        // }
 
         // Create PostHog fields for feature flag integration
         const posthogFields: Field[] = [
@@ -238,6 +238,7 @@ export const abTestingPlugin =
             admin: {
               condition: (data) => data?.enableABTesting === true,
               description: 'Name of this variant in PostHog (defaults to "variant")',
+              hidden: true,
               position: 'sidebar',
             },
             defaultValue: 'variant',
@@ -246,40 +247,118 @@ export const abTestingPlugin =
           },
         ]
 
-        // Create a tabs field with an A/B Testing tab
-        const abTestingTab: Field = {
+        // --- START: MODIFIED EXPERIMENT FIELDS ---
+        const experimentFields: Field[] = [
+          {
+            name: 'experimentName',
+            type: 'text',
+            admin: {
+              condition: (data) => data?.enableABTesting === true,
+              description:
+                'Name of the A/B testing experiment. This is used for tracking and analytics purposes.',
+              position: 'sidebar',
+            },
+            label: 'Experiment Name',
+            required: false,
+          },
+          {
+            name: 'experimentDescription',
+            type: 'textarea',
+            admin: {
+              condition: (data) => data?.enableABTesting === true,
+              description:
+                'A description of the experiment. This helps you remember what the test is for.',
+              position: 'sidebar',
+            },
+            label: 'Experiment Description',
+            required: false,
+          },
+          {
+            name: 'experimentMetrics',
+            type: 'array',
+            admin: {
+              condition: (data) => data?.enableABTesting === true,
+              description:
+                'Define the metrics to track for this experiment. Each metric requires a name and an event.',
+              position: 'sidebar',
+            },
+            fields: [
+              {
+                name: 'name',
+                type: 'text',
+                label: 'Metric Name',
+                required: true,
+              },
+              {
+                name: 'event',
+                type: 'text',
+                label: 'Event Name',
+                required: true,
+              },
+            ],
+            label: 'Experiment Metrics',
+            required: false,
+          },
+          {
+            name: 'experimentUrlFilter',
+            type: 'text',
+            admin: {
+              condition: (data) => data?.enableABTesting === true,
+              description:
+                'Regular expression for the URL where the experiment should run. The URL must match this expression to be part of the experiment. Leave blank to run the experiment on all pages.',
+              position: 'sidebar',
+            },
+            label: 'URL Filter (Regex)',
+            required: false,
+          },
+        ]
+        // --- END: MODIFIED EXPERIMENT FIELDS ---
+
+        // This is the new, single tabs field
+        const allTabs: Field = {
           type: 'tabs',
           tabs: [
-            // Keep the original tabs/fields as they are
+            // Original tab for content
             {
-              fields: collection.fields || [],
+              fields: [
+                {
+                  name: 'enableABTesting',
+                  type: 'checkbox',
+                  admin: {
+                    description:
+                      'Check this box to create an A/B testing variant for this document',
+                    position: 'sidebar',
+                  },
+                  defaultValue: false,
+                  label: 'Enable A/B Testing',
+                },
+                ...(collection.fields || []), // Keep original fields
+              ],
               label: 'Content',
             },
-            // Add a new tab for A/B Testing
+            // The existing tab for A/B testing variant configuration
             {
-              description:
-                'Configure A/B testing variants for this content. Enable A/B testing to start the experiment.',
+              admin: {
+                condition: (data) => data?.enableABTesting === true,
+              },
+              description: 'Configure A/B testing variants for this content',
               fields: [
-                enableABTestingField,
                 ...posthogFields,
+
                 {
                   name: 'abVariant',
                   type: 'group',
                   admin: {
                     className: 'ab-variant-group',
-                    condition: (data) => data?.enableABTesting === true,
                     description:
                       'Configure your A/B testing variant content here' as unknown as DescriptionFunction,
                   },
                   fields: variantFields,
                   hooks: {
-                    // Add a hook to sanitize the variant data before it's saved
                     beforeValidate: [
                       ({ value }) => {
-                        // If the value is an object, ensure it doesn't have any system fields
                         if (value && typeof value === 'object') {
-                          const sanitizedValue = sanitizeObject(value)
-                          return sanitizedValue
+                          return sanitizeObject(value)
                         }
                         return value
                       },
@@ -294,8 +373,127 @@ export const abTestingPlugin =
               ],
               label: '📊 A/B Testing',
             },
+            {
+              admin: {
+                condition: (data) => data?.enableABTesting === true,
+              },
+              description: 'Configure experiment-specific settings',
+              fields: [...experimentFields],
+              label: '📊 Experiments',
+            },
           ],
         }
+        // const allTabs: Field = {
+        //   type: 'tabs',
+        //   tabs: [
+        //     // Original tab for content
+        //     {
+        //       fields: collection.fields || [],
+        //       label: 'Content',
+        //     },
+        //     // The existing tab for A/B testing variant configuration
+        //     {
+        //       admin: {
+        //         condition: (data) => data?.enableABTesting === true,
+        //       },
+        //       description:
+        //         'Configure A/B testing variants for this content. Enable A/B testing to start the experiment.',
+        //       fields: [
+        //         enableABTestingField,
+        //         ...posthogFields,
+        //         {
+        //           name: 'abVariant',
+        //           type: 'group',
+        //           admin: {
+        //             className: 'ab-variant-group',
+        //             condition: (data) => data?.enableABTesting === true,
+        //             description:
+        //               'Configure your A/B testing variant content here' as unknown as DescriptionFunction,
+        //           },
+        //           fields: variantFields,
+        //           hooks: {
+        //             // Add a hook to sanitize the variant data before it's saved
+        //             beforeValidate: [
+        //               ({ value }) => {
+        //                 // If the value is an object, ensure it doesn't have any system fields
+        //                 if (value && typeof value === 'object') {
+        //                   const sanitizedValue = sanitizeObject(value)
+        //                   return sanitizedValue
+        //                 }
+        //                 return value
+        //               },
+        //             ],
+        //           },
+        //           label: '🎯 Variant Content',
+        //           localized: false,
+        //           nullable: true,
+        //           required: false,
+        //           unique: false,
+        //         } as GroupField,
+        //       ],
+        //       label: '📊 A/B Testing',
+        //     },
+        //     {
+        //       admin: {
+        //         condition: (data) => data?.enableABTesting === true,
+        //       },
+        //       description:
+        //         'Configure experiment-specific settings. This data is used for tracking and analytics purposes.',
+        //       fields: [...experimentFields],
+        //       label: '📊 Experiments',
+        //     },
+        //   ],
+        // }
+        // Create a tabs field with an A/B Testing tab
+        // const abTestingTab: Field = {
+        //   type: 'tabs',
+        //   tabs: [
+        //     // Keep the original tabs/fields as they are
+        //     {
+        //       fields: collection.fields || [],
+        //       label: 'Content',
+        //     },
+        //     // Add a new tab for A/B Testing
+        //     {
+        //       description:
+        //         'Configure A/B testing variants for this content. Enable A/B testing to start the experiment.',
+        //       fields: [
+        //         enableABTestingField,
+        //         ...posthogFields,
+        //         {
+        //           name: 'abVariant',
+        //           type: 'group',
+        //           admin: {
+        //             className: 'ab-variant-group',
+        //             condition: (data) => data?.enableABTesting === true,
+        //             description:
+        //               'Configure your A/B testing variant content here' as unknown as DescriptionFunction,
+        //           },
+        //           fields: variantFields,
+        //           hooks: {
+        //             // Add a hook to sanitize the variant data before it's saved
+        //             beforeValidate: [
+        //               ({ value }) => {
+        //                 // If the value is an object, ensure it doesn't have any system fields
+        //                 if (value && typeof value === 'object') {
+        //                   const sanitizedValue = sanitizeObject(value)
+        //                   return sanitizedValue
+        //                 }
+        //                 return value
+        //               },
+        //             ],
+        //           },
+        //           label: '🎯 Variant Content',
+        //           localized: false,
+        //           nullable: true,
+        //           required: false,
+        //           unique: false,
+        //         } as GroupField,
+        //       ],
+        //       label: ' A/B Testing',
+        //     },
+        //   ],
+        // }
 
         // Return the modified collection with tabs
         return {
@@ -305,7 +503,7 @@ export const abTestingPlugin =
             // Ensure we preserve any existing useAsTitle setting
             useAsTitle: collection.admin?.useAsTitle || 'title',
           },
-          fields: [abTestingTab],
+          fields: [allTabs],
         }
       }
       return collection
@@ -495,8 +693,78 @@ export const abTestingPlugin =
               )
             }
 
+            // --- START: NEW LOGIC FOR THE AUTOMATIC URL FILTER ---
+            // Checks if A/B testing is enabled and if the URL filter is empty.
+            if (currentData.enableABTesting && !currentData.experimentUrlFilter) {
+              let host = 'runway.ac'
+              // Simulates the Live Preview logic to get the host
+              if (currentData.brand) {
+                const brandDoc = await req.payload.findByID({
+                  //@ts-ignore
+                  id: currentData.brand,
+                  collection: 'brands',
+                })
+                host = brandDoc?.host || host
+              }
+
+              const docSlug = (currentData.slug as string) || (originalDoc?.slug as string)
+
+              if (host && docSlug) {
+                let slugPath = ''
+
+                if (collectionSlug === 'advertorials') {
+                  slugPath = `/a/${docSlug}`
+                } else if (collectionSlug === 'thankYouPages') {
+                  slugPath = `/t/${docSlug}`
+                } else if (collectionSlug === 'vsl') {
+                  slugPath = `/v/${docSlug}`
+                } else {
+                  slugPath = docSlug !== 'home' ? `/${docSlug}` : ''
+                }
+
+                // Escape special characters for regex
+                const escapedHost = host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                const escapedSlugPath = slugPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+                // Create the complete regular expression
+                const newUrlFilter = `^https://${escapedHost}${escapedSlugPath}(?:\\?.*)?$`
+
+                currentData.experimentUrlFilter = newUrlFilter
+                req.payload.logger.info(
+                  `[A/B Plugin] Automatically generated URL filter: ${newUrlFilter}`,
+                )
+              }
+            }
+            // --- END: NEW LOGIC ---
+
             // PostHog Feature Flag Management
-            await handlePostHogFeatureFlag(currentData, originalDoc, collectionSlug, req)
+            // --- UPDATED: Pass experimentUrlFilter to the handler ---
+            await handlePostHogFeatureFlag(
+              currentData,
+              originalDoc,
+              collectionSlug,
+              req,
+              currentData.experimentUrlFilter as string,
+            )
+
+            // NEW LOGIC: Automatically populate the experimentName field
+            // If A/B testing is enabled and the experimentName field is empty,
+            // set it to the value of the posthogFeatureFlagKey.
+            // This provides a default value while still allowing manual overrides.
+            if (
+              currentData.enableABTesting &&
+              currentData.posthogFeatureFlagKey &&
+              !currentData.experimentName
+            ) {
+              currentData.experimentName = currentData.posthogFeatureFlagKey
+              req.payload.logger.info(
+                `[A/B Plugin] Automatically populated experimentName with feature flag key: ${currentData.experimentName}`,
+              )
+            }
+            // --- START: NEW LOGIC FOR EXPERIMENTS ---
+            // PostHog Experiment Management
+            await handlePostHogExperiment(currentData, originalDoc, req)
+            // --- END: NEW LOGIC FOR EXPERIMENTS ---
           } else if (wasABTestingEnabled && !isABTestingEnabled) {
             // A/B testing is being disabled
             req.payload.logger.info(`[A/B Plugin] A/B testing disabled for ${collectionSlug}.`)
@@ -509,7 +777,6 @@ export const abTestingPlugin =
             //   await handlePostHogFeatureFlagDeactivation(currentData, req)
             // }
           }
-
           return currentData
         } catch (error) {
           req.payload.logger.error(
@@ -526,6 +793,7 @@ export const abTestingPlugin =
         originalDoc: any,
         collectionSlug: string,
         req: any,
+        experimentUrlFilter: string,
       ): Promise<void> {
         try {
           const featureFlagKey = currentData.posthogFeatureFlagKey as string | undefined
@@ -550,13 +818,15 @@ export const abTestingPlugin =
             // `A/B Test: ${collectionSlug}`,
             docId: originalDoc?._id || originalDoc?.id || currentData.id,
             variantName,
+            // --- NEW: Add the URL filter to the payload ---
+            urlFilter: experimentUrlFilter,
           }
 
           req.payload.logger.info(
             `[A/B Plugin] Calling PostHog endpoint to create/update feature flag: ${featureFlagKey}`,
           )
           req.payload.logger.info(
-            `[A/B Plugin] Full endpoint URL: ${req.payload.config.serverURL}/posthog/feature-flags`,
+            `[A/B Plugin] Full endpoint URL: ${req.payload.config.serverURL}/api/posthog/feature-flags`,
           )
           req.payload.logger.info(
             `[A/B Plugin] Request payload:`,
@@ -620,59 +890,127 @@ export const abTestingPlugin =
         }
       }
 
-      // Helper function to handle PostHog feature flag deactivation
-      // async function handlePostHogFeatureFlagDeactivation(
-      //   currentData: Record<string, unknown>,
-      //   req: any,
-      // ): Promise<void> {
-      //   try {
-      //     const featureFlagKey = currentData.posthogFeatureFlagKey as string
+      // --- START: NEW HELPER FUNCTION FOR EXPERIMENTS ---
+      async function handlePostHogExperiment(
+        currentData: Record<string, unknown>,
+        originalDoc: any,
+        req: any,
+      ): Promise<void> {
+        try {
+          const {
+            experimentDescription,
+            experimentMetrics,
+            experimentName,
+            posthogFeatureFlagKey,
+          } = currentData
 
-      //     req.payload.logger.info(
-      //       `[A/B Plugin] Calling PostHog endpoint to deactivate feature flag: ${featureFlagKey}`,
-      //     )
+          // We only create an experiment if there is at least one metric defined
+          if (
+            !experimentMetrics ||
+            !Array.isArray(experimentMetrics) ||
+            experimentMetrics.length === 0
+          ) {
+            req.payload.logger.info(
+              '[A/B Plugin] No experiment metrics defined. Skipping experiment creation.',
+            )
+            return
+          }
 
-      //     // FIXED: Use the correct endpoint path without /api prefix
-      //     const response = await fetch(
-      //       `${req.payload.config.serverURL}/posthog/feature-flags/deactivate`,
-      //       {
-      //         method: 'POST',
-      //         headers: {
-      //           'Content-Type': 'application/json',
-      //         },
-      //         body: JSON.stringify({
-      //           featureFlagKey: featureFlagKey,
-      //         }),
-      //       },
-      //     )
+          // Ensure we have a feature flag key, as it's required for the experiment
+          if (!posthogFeatureFlagKey) {
+            req.payload.logger.error(
+              '[A/B Plugin] Cannot create experiment: posthogFeatureFlagKey is missing.',
+            )
+            return
+          }
 
-      //     if (!response.ok) {
-      //       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-      //       req.payload.logger.error(
-      //         `[A/B Plugin] PostHog deactivation endpoint responded with error ${response.status}:`,
-      //         errorData,
-      //       )
-      //       // Don't throw here - deactivation failure shouldn't prevent document save
-      //     } else {
-      //       req.payload.logger.info(
-      //         `[A/B Plugin] PostHog feature flag ${featureFlagKey} deactivated successfully`,
-      //       )
-      //     }
-      //   } catch (error) {
-      //     req.payload.logger.error(
-      //       '[A/B Plugin] Error deactivating PostHog feature flag:',
-      //       error instanceof Error ? error.message : error,
-      //     )
-      //     // Don't throw here - deactivation failure shouldn't prevent document save
-      //   }
-      // }
+          // Use the document's updatedAt date as the start date
+          // const startDate = originalDoc?.updatedAt
+          //   ? new Date(originalDoc.updatedAt).toISOString()
+          //   : new Date().toISOString()
 
-      // Add the hook to this specific collection
+          // Map the simple metrics array from Payload to the format PostHog expects
+          const formattedMetrics = experimentMetrics.map((metric) => ({
+            kind: 'ExperimentMetric',
+            // Generate a unique ID for each metric (a requirement of the PostHog API)
+            metric_type: 'funnel', // Assuming 'funnel' as a default for now
+            series: [
+              {
+                event: metric.event,
+                kind: 'EventsNode',
+                properties: [
+                  {
+                    type: 'event',
+                    key: 'flagKey',
+                    operator: 'exact',
+                    value: [posthogFeatureFlagKey],
+                  },
+                ],
+              },
+            ],
+            uuid: crypto.randomUUID(),
+          }))
+
+          // Prepare the payload for the PostHog experiments endpoint
+          const postHogExperimentPayload = {
+            name: experimentName || posthogFeatureFlagKey, // Use key as fallback
+            description: experimentDescription || `Experiment for ${posthogFeatureFlagKey}`,
+            feature_flag_key: posthogFeatureFlagKey,
+            filters: {}, // --- UPDATED: The filters are now handled by the feature flag endpoint
+            metrics: formattedMetrics,
+            // start_date: startDate, // --- When no passing a start date, it will be saved as "draft" in PostHog
+          }
+
+          req.payload.logger.info(
+            '[A/B Plugin] Calling PostHog endpoint to create/update experiment',
+          )
+          req.payload.logger.info(
+            `[A/B Plugin] Full endpoint URL: ${req.payload.config.serverURL}/api/posthog/experiments`,
+          )
+          req.payload.logger.info(
+            `[A/B Plugin] Request payload:`,
+            JSON.stringify(postHogExperimentPayload, null, 2),
+          )
+
+          const response = await fetch(`${req.payload.config.serverURL}/api/posthog/experiments`, {
+            body: JSON.stringify(postHogExperimentPayload),
+            headers: {
+              Authorization: `Bearer ${process.env.INTERNAL_API_TOKEN}`,
+              'Content-Type': 'application/json',
+            },
+            method: 'POST',
+          })
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            let errorData
+            try {
+              errorData = JSON.parse(errorText)
+            } catch (e) {
+              errorData = { error: errorText }
+            }
+            throw new Error(
+              `PostHog Experiments API error: ${response.status} - ${JSON.stringify(errorData)}`,
+            )
+          }
+
+          const result = await response.json()
+          req.payload.logger.info(
+            `[A/B Plugin] PostHog experiment for flag "${posthogFeatureFlagKey}" created successfully with ID: ${result.id}`,
+          )
+        } catch (error) {
+          req.payload.logger.error(
+            '[A/B Plugin] Detailed error managing PostHog experiment:',
+            error instanceof Error ? error.message : error,
+          )
+          // Do not re-throw here, as experiment creation is secondary to the document save
+          // The document should still save even if the experiment fails to create
+        }
+      }
+      // --- END: NEW HELPER FUNCTION FOR EXPERIMENTS ---
+
       collection.hooks.beforeChange.push(copyToVariantHook)
     })
 
     return config
   }
-
-// For backward compatibility
-export default abTestingPlugin
