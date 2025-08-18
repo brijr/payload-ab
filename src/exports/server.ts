@@ -4,10 +4,10 @@ import { PostHog } from 'posthog-node'
 import { cookies } from 'next/headers'
 
 // --- Re-define the type for the returned document ---
-export type ABTestedDocument<T extends Record<string, unknown>> = T & {
+export type ABTestedDocument<T extends Record<string, unknown>> = {
   // We can simplify this now, as the server handles everything.
   // We just need to return the final document.
-}
+} & T
 
 // --- Initialize PostHog server-side client ---
 const posthogClient = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY || '', {
@@ -30,14 +30,14 @@ export const getServerSideABVariant = async <
   T extends Record<string, unknown> = Record<string, unknown>,
 >(
   document: D & T,
-): Promise<T & { posthogAssignedVariantKey?: string | 'unassigned' }> => {
+): Promise<{ posthogAssignedVariantKey?: 'unassigned' | string } & T> => {
   if (!document?.enableABTesting || !document.abVariant) {
     return { ...document, posthogAssignedVariantKey: 'control' }
   }
 
   const cookieStore = cookies()
   const featureFlagKey = document.posthogFeatureFlagKey || `ab_test_${String(document.id)}`
-  let assignedVariantKey: string | 'unassigned' = 'unassigned'
+  let assignedVariantKey: 'unassigned' | string = 'unassigned'
 
   try {
     const existingVariantCookie = cookieStore.get(`ph_feature_flag_${featureFlagKey}`)

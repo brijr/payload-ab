@@ -195,16 +195,16 @@ export const abTestingPlugin =
         }
 
         // Add a toggle field to enable/disable A/B testing for this document
-        const enableABTestingField: Field = {
-          name: 'enableABTesting',
-          type: 'checkbox',
-          admin: {
-            description: 'Check this box to create an A/B testing variant for this document',
-            position: 'sidebar',
-          },
-          defaultValue: false,
-          label: 'Enable A/B Testing',
-        }
+        // const enableABTestingField: Field = {
+        //   name: 'enableABTesting',
+        //   type: 'checkbox',
+        //   admin: {
+        //     description: 'Check this box to create an A/B testing variant for this document',
+        //     position: 'sidebar',
+        //   },
+        //   defaultValue: false,
+        //   label: 'Enable A/B Testing',
+        // }
 
         // Create PostHog fields for feature flag integration
         const posthogFields: Field[] = [
@@ -238,6 +238,7 @@ export const abTestingPlugin =
             admin: {
               condition: (data) => data?.enableABTesting === true,
               description: 'Name of this variant in PostHog (defaults to "variant")',
+              hidden: true,
               position: 'sidebar',
             },
             defaultValue: 'variant',
@@ -320,7 +321,6 @@ export const abTestingPlugin =
             // Original tab for content
             {
               fields: [
-                // Add the enableABTesting checkbox here so it's always visible
                 {
                   name: 'enableABTesting',
                   type: 'checkbox',
@@ -344,6 +344,7 @@ export const abTestingPlugin =
               description: 'Configure A/B testing variants for this content',
               fields: [
                 ...posthogFields,
+
                 {
                   name: 'abVariant',
                   type: 'group',
@@ -924,9 +925,9 @@ export const abTestingPlugin =
           }
 
           // Use the document's updatedAt date as the start date
-          const startDate = originalDoc?.updatedAt
-            ? new Date(originalDoc.updatedAt).toISOString()
-            : new Date().toISOString()
+          // const startDate = originalDoc?.updatedAt
+          //   ? new Date(originalDoc.updatedAt).toISOString()
+          //   : new Date().toISOString()
 
           // Map the simple metrics array from Payload to the format PostHog expects
           const formattedMetrics = experimentMetrics.map((metric) => ({

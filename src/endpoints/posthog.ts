@@ -484,7 +484,7 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
           console.error('Error in /posthog/feature-flags/deactivate POST:', error)
           return new Response(
             JSON.stringify({
-              error: error instanceof Error ? error.message : 'Internal server error',
+              error: error instanceof Error ? error.message : 'Internal server errorW',
             }),
             {
               headers: { 'Content-Type': 'application/json' },
