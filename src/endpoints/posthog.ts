@@ -42,7 +42,12 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
   const posthogApiKey = posthogConfig?.apiKey || process.env.POSTHOG_PERSONAL_API_KEY || ''
   const posthogApiHost = posthogConfig?.host || process.env.POSTHOG_HOST || 'https://us.posthog.com'
   const posthogProjectId = posthogConfig?.projectId || process.env.POSTHOG_PROJECT_ID || ''
-
+  type PostHogPropertyFilter = {
+    key: string
+    operator: string
+    type: string
+    value: any
+  }
   // Helper function to parse request body consistently
   const parseRequestBody = async (request: {
     body: BodyInit | null | undefined
@@ -164,7 +169,6 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
     // Create or update a feature flag
     {
       handler: withAuth(async (req) => {
-
         try {
           validatePostHogConfig()
 
@@ -175,6 +179,7 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
           const name = body?.name
           const variantName = body?.variantName
           const docId = body?.docId
+          const urlFilter = body?.urlFilter //
           //console.log('Extracted values:', { key, name, variantName, docId })
 
           // Validate required parameters - Fixed logic
@@ -201,36 +206,86 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
 
           const flagName = name || `A/B Test: ${docId}`
           const variantKey = variantName || 'variant'
+          // Start with a basic filters object
 
-          // Create feature flag configuration
+          const filters: {
+            groups: {
+              properties: PostHogPropertyFilter[]
+              rollout_percentage: null | number
+            }[]
+            multivariate: {
+              variants: { key: string; name: string; rollout_percentage: number }[]
+            }
+          } = {
+            groups: [
+              {
+                properties: [],
+                rollout_percentage: null,
+              },
+            ],
+
+            multivariate: {
+              variants: [
+                {
+                  name: 'Control',
+                  key: 'control',
+                  rollout_percentage: 50,
+                },
+                {
+                  name: variantKey.charAt(0).toUpperCase() + variantKey.slice(1),
+                  key: variantKey,
+                  rollout_percentage: 50,
+                },
+              ],
+            },
+          }
+
+          // --- NEW: Add URL filter if present
+          if (urlFilter) {
+            filters.groups[0].properties.push({
+              type: 'person',
+              key: '$current_url',
+              operator: 'regex',
+              value: urlFilter,
+            })
+          }
+
           const featureFlagConfig = {
             name: flagName,
             active: true,
             ensure_persistence: true,
-            filters: {
-              groups: [
-                {
-                  properties: [],
-                  rollout_percentage: null,
-                },
-              ],
-              multivariate: {
-                variants: [
-                  {
-                    name: 'Control',
-                    key: 'control',
-                    rollout_percentage: 50,
-                  },
-                  {
-                    name: variantKey.charAt(0).toUpperCase() + variantKey.slice(1),
-                    key: variantKey,
-                    rollout_percentage: 50,
-                  },
-                ],
-              },
-            },
+            filters,
             key: featureFlagKey,
           }
+          // Create feature flag configuration
+          // const featureFlagConfig = {
+          //   name: flagName,
+          //   active: true,
+          //   ensure_persistence: true,
+          //   filters: {
+          //     groups: [
+          //       {
+          //         properties: [],
+          //         rollout_percentage: null,
+          //       },
+          //     ],
+          //     multivariate: {
+          //       variants: [
+          //         {
+          //           name: 'Control',
+          //           key: 'control',
+          //           rollout_percentage: 50,
+          //         },
+          //         {
+          //           name: variantKey.charAt(0).toUpperCase() + variantKey.slice(1),
+          //           key: variantKey,
+          //           rollout_percentage: 50,
+          //         },
+          //       ],
+          //     },
+          //   },
+          //   key: featureFlagKey,
+          // }
 
           // Check if flag already exists
           const existingFlagResponse = await fetch(
@@ -429,7 +484,7 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
           console.error('Error in /posthog/feature-flags/deactivate POST:', error)
           return new Response(
             JSON.stringify({
-              error: error instanceof Error ? error.message : 'Internal server error',
+              error: error instanceof Error ? error.message : 'Internal server errorW',
             }),
             {
               headers: { 'Content-Type': 'application/json' },
@@ -440,6 +495,130 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
       }),
       method: 'post',
       path: '/posthog/feature-flags/deactivate',
+    },
+    // NEW: Endpoint to create a PostHog experiment
+    {
+      handler: withAuth(async (req) => {
+        try {
+          validatePostHogConfig()
+
+          const body = (await parseRequestBody(req as any)) || {}
+          const { name, feature_flag_key, ...optionalParams } = body
+
+          // Validate required parameters
+          if (!name || !feature_flag_key) {
+            return new Response(
+              JSON.stringify({
+                error: 'Missing required parameters: name and feature_flag_key',
+              }),
+              {
+                headers: { 'Content-Type': 'application/json' },
+                status: 400,
+              },
+            )
+          }
+
+          // Prepare the payload for the PostHog API
+          const payload = {
+            name,
+            feature_flag_key,
+            ...optionalParams, // Spread any other provided parameters
+          }
+
+          const response = await fetch(
+            `${posthogApiHost}/api/projects/${posthogProjectId}/experiments/`,
+            {
+              body: JSON.stringify(payload),
+              headers: createPostHogHeaders(),
+              method: 'POST',
+            },
+          )
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error(`PostHog API error ${response.status}: ${errorText}`)
+            return new Response(
+              JSON.stringify({
+                details: errorText,
+                error: 'Failed to create experiment in PostHog',
+              }),
+              {
+                headers: { 'Content-Type': 'application/json' },
+                status: response.status,
+              },
+            )
+          }
+
+          const data = await response.json()
+          return new Response(JSON.stringify(data), {
+            headers: { 'Content-Type': 'application/json' },
+            status: 201,
+          })
+        } catch (error) {
+          console.error('Error in /posthog/experiments POST:', error)
+          return new Response(
+            JSON.stringify({
+              error: error instanceof Error ? error.message : 'Internal server error',
+            }),
+            {
+              headers: { 'Content-Type': 'application/json' },
+              status: 500,
+            },
+          )
+        }
+      }),
+      method: 'post',
+      path: '/posthog/experiments',
+    },
+    // Fetch all experiments
+    {
+      handler: withAuth(async (req) => {
+        try {
+          validatePostHogConfig()
+
+          const response = await fetch(
+            `${posthogApiHost}/api/projects/${posthogProjectId}/experiments/`,
+            {
+              headers: createPostHogHeaders(),
+              method: 'GET',
+            },
+          )
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error(`PostHog API error ${response.status}: ${errorText}`)
+            return new Response(
+              JSON.stringify({
+                details: errorText,
+                error: 'Failed to fetch experiments from PostHog',
+              }),
+              {
+                headers: { 'Content-Type': 'application/json' },
+                status: response.status,
+              },
+            )
+          }
+
+          const data = await response.json()
+          return new Response(JSON.stringify(data), {
+            headers: { 'Content-Type': 'application/json' },
+            status: 200,
+          })
+        } catch (error) {
+          console.error('Error in /posthog/experiments GET:', error)
+          return new Response(
+            JSON.stringify({
+              error: error instanceof Error ? error.message : 'Internal server error',
+            }),
+            {
+              headers: { 'Content-Type': 'application/json' },
+              status: 500,
+            },
+          )
+        }
+      }),
+      method: 'get',
+      path: '/posthog/experiments',
     },
   ]
 }
