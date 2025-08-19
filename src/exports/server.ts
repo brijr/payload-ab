@@ -19,6 +19,14 @@ export interface CookieAccessor {
   ) => void // Re-added 'set' temporarily for clarity if needed elsewhere, but it's not used in getServerSideABVariant directly now.
 }
 
+// --- NEW: Request context interface for proper feature flag evaluation ---
+export interface RequestContext {
+  url?: string
+  pathname?: string
+  host?: string
+  headers?: Record<string, string>
+}
+
 // --- Define the type for the returned document, including the assigned variant key and cookie info ---
 export type ABTestedDocument<T extends Record<string, unknown>> = T & {
   posthogAssignedVariantKey?: string // The variant assigned by PostHog
@@ -39,6 +47,7 @@ const posthogClient = new PostHog(process.env.NEXT_PUBLIC_POSTHOG_KEY || '', {
  *
  * @param document The original Payload CMS document.
  * @param cookies The cookies object from Next.js `cookies()`.
+ * @param context Optional request context for proper feature flag evaluation with release conditions.
  * @returns The content to display (either the variant or the original), augmented with PostHog details for client-side cookie setting.
  */
 export const getServerSideABVariant = async <
@@ -51,6 +60,7 @@ export const getServerSideABVariant = async <
 >(
   document: D & T,
   cookies: CookieAccessor, // Using the generic CookieAccessor interface
+  context?: RequestContext, // Optional context for backwards compatibility
 ): Promise<ABTestedDocument<T>> => {
   // If A/B testing is not enabled, return the original document
 
@@ -71,19 +81,44 @@ export const getServerSideABVariant = async <
       distinctId = newDistinctIdGenerated // Use the newly generated ID for flag evaluation
     }
 
-    // // --- IMPORTANT DEBUGGING LINES (keeping for now, I'll delete later when I'm sure it's working in production) ---
-    // console.log('--- PostHog Server Init Debug ---')
-    // console.log('POSTHOG_API_KEY (used for evaluation):', process.env.NEXT_PUBLIC_POSTHOG_KEY)
-    // console.log('POSTHOG_HOST:', process.env.NEXT_PUBLIC_POSTHOG_HOST)
-    // console.log('---------------------------------')
-    // console.log(
-    //   `[A/B Plugin] Server-side: Attempting to fetch flag "${featureFlagKey}" for distinct ID "${distinctId}".`,
-    // )
-    // const allFlags = await posthogClient.getAllFlags(distinctId); // Optional: if you want to see all flags
-    // console.log(`[A/B Plugin] Server-side: All flags for distinct ID "${distinctId}":`, JSON.stringify(allFlags, null, 2));
-    // --- END IMPORTANT DEBUGGING LINES ---
+    // Build person properties with request context for proper release condition evaluation
+    const personProperties: Record<string, any> = {}
+    
+    // Add request context properties that PostHog uses for release conditions
+    if (context) {
+      // Add URL-related properties
+      if (context.url) {
+        const urlObj = new URL(context.url)
+        personProperties['$current_url'] = context.url
+        personProperties['$host'] = urlObj.hostname
+        personProperties['$pathname'] = urlObj.pathname
+      } else {
+        if (context.host) personProperties['$host'] = context.host
+        if (context.pathname) personProperties['$pathname'] = context.pathname
+      }
+      
+      // Add any custom headers that might be used in release conditions
+      if (context.headers) {
+        Object.entries(context.headers).forEach(([key, value]) => {
+          personProperties[`$header_${key.toLowerCase().replace(/-/g, '_')}`] = value
+        })
+      }
+    }
 
-    const flagResponse = await posthogClient.getFeatureFlag(featureFlagKey, distinctId)
+    console.log(
+      `[A/B Plugin] Server-side: Evaluating flag "${featureFlagKey}" for distinct ID "${distinctId}" with context:`,
+      { pathname: personProperties['$pathname'], host: personProperties['$host'] }
+    )
+
+    // Pass person properties to PostHog for proper release condition evaluation
+    const flagResponse = await posthogClient.getFeatureFlag(
+      featureFlagKey,
+      distinctId,
+      {
+        personProperties,
+        groups: {},
+      }
+    )
     console.log('Raw flag response:', flagResponse, 'Type:', typeof flagResponse)
     // Handle both boolean and string variants
     // Handle all possible response types
