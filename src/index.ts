@@ -723,11 +723,12 @@ export const abTestingPlugin =
                 }
 
                 // Escape special characters for regex
-                const escapedHost = host.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+                const escapedHost = host.replace(/[*+?^${}()|[\]\\]/g, '\\$&') // Removed . from the character class
                 const escapedSlugPath = slugPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
                 // Create the complete regular expression
-                const newUrlFilter = `^https://${escapedHost}${escapedSlugPath}(?:\\?.*)?$`
+                const newUrlFilter =
+                  `^https://${escapedHost}${escapedSlugPath}(?:` + '\\\\?' + '.*)?$'
 
                 currentData.experimentUrlFilter = newUrlFilter
                 req.payload.logger.info(
