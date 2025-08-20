@@ -83,7 +83,7 @@ export const getServerSideABVariant = async <
 
     // Build person properties with request context for proper release condition evaluation
     const personProperties: Record<string, any> = {}
-    
+
     // Add request context properties that PostHog uses for release conditions
     if (context) {
       // Add URL-related properties
@@ -96,7 +96,7 @@ export const getServerSideABVariant = async <
         if (context.host) personProperties['$host'] = context.host
         if (context.pathname) personProperties['$pathname'] = context.pathname
       }
-      
+
       // Add any custom headers that might be used in release conditions
       if (context.headers) {
         Object.entries(context.headers).forEach(([key, value]) => {
@@ -107,18 +107,14 @@ export const getServerSideABVariant = async <
 
     console.log(
       `[A/B Plugin] Server-side: Evaluating flag "${featureFlagKey}" for distinct ID "${distinctId}" with context:`,
-      { pathname: personProperties['$pathname'], host: personProperties['$host'] }
+      { pathname: personProperties['$pathname'], host: personProperties['$host'] },
     )
 
     // Pass person properties to PostHog for proper release condition evaluation
-    const flagResponse = await posthogClient.getFeatureFlag(
-      featureFlagKey,
-      distinctId,
-      {
-        personProperties,
-        groups: {},
-      }
-    )
+    const flagResponse = await posthogClient.getFeatureFlag(featureFlagKey, distinctId, {
+      personProperties,
+      groups: {},
+    })
     console.log('Raw flag response:', flagResponse, 'Type:', typeof flagResponse)
     // Handle both boolean and string variants
     // Handle all possible response types
@@ -132,7 +128,7 @@ export const getServerSideABVariant = async <
     } else {
       assignedVariantKey = 'control' // fallback
     }
-    if (assignedVariantKey === 'variant') {
+    if (assignedVariantKey !== 'control') {
       finalDocument = merge({}, document, document.abVariant) as T
     } else {
       finalDocument = document
