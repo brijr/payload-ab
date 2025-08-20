@@ -205,7 +205,7 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
           }
 
           const flagName = name || `A/B Test: ${docId}`
-          // const variantKey = variantName || 'variant'
+          const variantKey = variantName || 'variant'
           // Start with a basic filters object
 
           const filters: {
@@ -232,8 +232,8 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
                   rollout_percentage: 50,
                 },
                 {
-                  name: 'Variant',
-                  key: 'variant',
+                  name: variantKey.charAt(0).toUpperCase() + variantKey.slice(1),
+                  key: variantKey,
                   rollout_percentage: 50,
                 },
               ],
