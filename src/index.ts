@@ -290,15 +290,15 @@ export const abTestingPlugin =
                 options: [
                   {
                     label: 'CTA Click',
-                    value: 'cta-click',
+                    value: 'cta_click',
                   },
                   {
                     label: 'Form Submit',
-                    value: 'form-submit',
+                    value: 'form_submit',
                   },
                   {
                     label: 'Page View',
-                    value: 'page-view',
+                    value: 'page_view',
                   },
                 ],
               },
