@@ -278,27 +278,49 @@ export const abTestingPlugin =
             type: 'array',
             admin: {
               condition: (data) => data?.enableABTesting === true,
-              description:
-                'Define the metrics to track for this experiment. Each metric requires a name and an event.',
+              description: 'Define the metrics to track for this experiment.',
               position: 'sidebar',
             },
             fields: [
               {
+                name: 'metric',
+                type: 'select',
+                label: 'Metric',
+                required: true,
+                options: [
+                  {
+                    label: 'CTA Click',
+                    value: 'cta-click',
+                  },
+                  {
+                    label: 'Form Submit',
+                    value: 'form-submit',
+                  },
+                  {
+                    label: 'Page View',
+                    value: 'page-view',
+                  },
+                ],
+              },
+              {
                 name: 'name',
                 type: 'text',
                 label: 'Metric Name',
-                required: true,
+                required: false,
+                hidden: true,
               },
               {
                 name: 'event',
                 type: 'text',
                 label: 'Event Name',
-                required: true,
+                required: false,
+                hidden: true,
               },
             ],
             label: 'Experiment Metrics',
             required: false,
           },
+
           {
             name: 'experimentUrlFilter',
             type: 'text',
@@ -379,7 +401,7 @@ export const abTestingPlugin =
               },
               description: 'Configure experiment-specific settings',
               fields: [...experimentFields],
-              label: '📊 Experiments',
+              label: '🧪 Experiments',
             },
           ],
         }
@@ -937,7 +959,7 @@ export const abTestingPlugin =
             metric_type: 'funnel', // Assuming 'funnel' as a default for now
             series: [
               {
-                event: metric.event,
+                event: metric?.event || metric?.name || metric?.metric,
                 kind: 'EventsNode',
                 properties: [
                   {
