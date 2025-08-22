@@ -496,7 +496,7 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
       method: 'post',
       path: '/posthog/feature-flags/deactivate',
     },
-    // NEW: Endpoint to create a PostHog experiment
+    // NEW: Endpoint to create or update a PostHog experiment
     {
       handler: withAuth(async (req) => {
         try {
@@ -518,42 +518,119 @@ export const createPostHogEndpoints = (posthogConfig?: PostHogConfig) => {
             )
           }
 
-          // Prepare the payload for the PostHog API
-          const payload = {
-            name,
-            feature_flag_key,
-            ...optionalParams, // Spread any other provided parameters
-          }
-
-          const response = await fetch(
-            `${posthogApiHost}/api/projects/${posthogProjectId}/experiments/`,
+          // Check if experiment already exists by name
+          const existingExperimentResponse = await fetch(
+            `${posthogApiHost}/api/projects/${posthogProjectId}/experiments/?search=${encodeURIComponent(name)}`,
             {
-              body: JSON.stringify(payload),
               headers: createPostHogHeaders(),
-              method: 'POST',
+              method: 'GET',
             },
           )
 
-          if (!response.ok) {
-            const errorText = await response.text()
-            console.error(`PostHog API error ${response.status}: ${errorText}`)
-            return new Response(
-              JSON.stringify({
-                details: errorText,
-                error: 'Failed to create experiment in PostHog',
-              }),
-              {
-                headers: { 'Content-Type': 'application/json' },
-                status: response.status,
-              },
+          let existingExperiment = null
+          if (existingExperimentResponse.ok) {
+            const existingExperiments = await existingExperimentResponse.json()
+            existingExperiment = existingExperiments.results?.find(
+              (exp: { name: string }) => exp.name === name,
             )
           }
 
-          const data = await response.json()
-          return new Response(JSON.stringify(data), {
-            headers: { 'Content-Type': 'application/json' },
-            status: 201,
-          })
+          let apiResponse
+          let responseStatus = 200
+
+          if (existingExperiment) {
+            // Update existing experiment
+            console.log(`Updating existing experiment: ${name}`)
+
+            // Only update essential fields that might have changed, preserve existing state
+            const updatePayload: any = {}
+
+            // Only update name if it actually changed
+            if (existingExperiment.name !== name) {
+              updatePayload.name = name
+            }
+
+            // Only update feature_flag_key if it actually changed
+            if (existingExperiment.feature_flag_key !== feature_flag_key) {
+              updatePayload.feature_flag_key = feature_flag_key
+            }
+
+            // Only include optional params if they're actually provided and different
+            Object.entries(optionalParams).forEach(([key, value]) => {
+              if (existingExperiment[key] !== value && value !== undefined) {
+                updatePayload[key] = value
+              }
+            })
+
+            // If no fields need updating, skip the API call
+            if (Object.keys(updatePayload).length === 0) {
+              console.log(`No changes detected for experiment: ${name}, skipping update`)
+              apiResponse = existingExperiment
+            } else {
+              console.log(`Updating experiment fields:`, updatePayload)
+
+              const updateResponse = await fetch(
+                `${posthogApiHost}/api/projects/${posthogProjectId}/experiments/${existingExperiment.id}/`,
+                {
+                  body: JSON.stringify(updatePayload),
+                  headers: createPostHogHeaders(),
+                  method: 'PATCH',
+                },
+              )
+
+              if (!updateResponse.ok) {
+                const errorText = await updateResponse.text()
+                throw new Error(
+                  `Failed to update experiment: ${updateResponse.status} - ${errorText}`,
+                )
+              }
+
+              apiResponse = await updateResponse.json()
+              console.log(`Successfully updated PostHog experiment: ${name}`)
+            }
+          } else {
+            // Create new experiment
+            console.log(`Creating new experiment: ${name}`)
+
+            const payload = {
+              name,
+              feature_flag_key,
+              ...optionalParams, // Spread any other provided parameters
+            }
+
+            const createResponse = await fetch(
+              `${posthogApiHost}/api/projects/${posthogProjectId}/experiments/`,
+              {
+                body: JSON.stringify(payload),
+                headers: createPostHogHeaders(),
+                method: 'POST',
+              },
+            )
+
+            if (!createResponse.ok) {
+              const errorText = await createResponse.text()
+              throw new Error(
+                `Failed to create experiment: ${createResponse.status} - ${errorText}`,
+              )
+            }
+
+            apiResponse = await createResponse.json()
+            responseStatus = 201
+            console.log(`Successfully created PostHog experiment: ${name}`)
+          }
+
+          return new Response(
+            JSON.stringify({
+              action: existingExperiment ? 'updated' : 'created',
+              experiment: apiResponse,
+              name,
+              message: 'Experiment processed successfully',
+            }),
+            {
+              headers: { 'Content-Type': 'application/json' },
+              status: responseStatus,
+            },
+          )
         } catch (error) {
           console.error('Error in /posthog/experiments POST:', error)
           return new Response(
