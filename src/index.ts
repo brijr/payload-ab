@@ -301,6 +301,28 @@ export const abTestingPlugin =
                     value: 'page_view',
                   },
                 ],
+                hooks: {
+                  beforeChange: [
+                    // Auto-populate name and event fields when metric is selected
+                    ({ value, siblingData }) => {
+                      if (value) {
+                        // Map metric value to appropriate name and event
+                        const metricMap = {
+                          cta_click: { name: 'CTA Click', event: 'cta_click' },
+                          form_submit: { name: 'Form Submit', event: 'form_submit' },
+                          page_view: { name: 'Page View', event: 'page_view' },
+                        }
+
+                        const metricInfo = metricMap[value as keyof typeof metricMap]
+                        if (metricInfo) {
+                          siblingData.name = metricInfo.name
+                          siblingData.event = metricInfo.event
+                        }
+                      }
+                      return value
+                    },
+                  ],
+                },
               },
               {
                 name: 'name',
@@ -959,7 +981,7 @@ export const abTestingPlugin =
             metric_type: 'funnel', // Assuming 'funnel' as a default for now
             series: [
               {
-                event: metric?.event || metric?.name || metric?.metric,
+                event: metric.metric,
                 kind: 'EventsNode',
                 properties: [
                   {
